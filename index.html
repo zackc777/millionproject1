@@ -23,6 +23,10 @@
 <style>
 .modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(5px);display:grid;place-items:center;padding:16px;z-index:1000}.modal{width:min(720px,100%);max-height:90vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:0 30px 80px rgba(15,23,42,.2);padding:18px}.modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.modal-head h3{margin:0}.history-actions{display:flex;gap:6px;flex-wrap:wrap}.search-empty{padding:14px;border:1px dashed var(--line);border-radius:14px;background:#fafcff}.search-meta{font-size:12px;color:var(--muted);margin-top:3px}.research-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.course-action{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fff}.course-action .do{color:var(--blue);font-weight:900}.course-action .why{font-size:12px;color:var(--muted);margin-top:5px}.course-check{display:flex;gap:9px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}.course-check:last-child{border-bottom:0}@media(max-width:600px){.modal{padding:14px}.history-actions .btn{flex:1}.course-action{padding:12px}}
 </style>
+
+<style>
+.finance-head{padding-bottom:16px}.finance-kpis .metric{min-height:118px}.finance-flow-note{background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px;padding:12px 14px}.finance-layout .card{min-width:0}@media(max-width:700px){.finance-kpis{grid-template-columns:1fr 1fr}.finance-head .num{font-size:22px}}
+</style>
 </head><body><div class="wrap"><header class="top"><div class="brand"><div class="logo">MP</div><div><h1>millionproject.</h1><div class="sub">你的第一個 100 萬｜理財 × 資產配置 × 全市場研究 × 決策</div></div></div><div class="sync" id="sync"><span class="dot"></span>連線中</div></header><div id="nav" class="nav"></div><main id="app"></main><div class="footer">millionproject. · 研究是研究，投資是投資；重大判斷保留 Fact / Analysis / Risk / Reference。</div></div><script>
 const U='https://jypukgxllsilctsmfxmw.supabase.co',K='sb_publishable_u7KFH6kyuuJZies_avPwug_TXWnb6A8';let c,u,tab='o';const tabs=[['o','總覽'],['m','每月財務'],['c','信用卡'],['p','投資組合'],['r','市場研究'],['d','決策紀錄'],['l','投資課'],['s','設定']];const $=x=>document.getElementById(x);
 const DEFAULT_GOAL=1000000;
@@ -46,8 +50,9 @@ function setGoalValue(v){
   return n;
 }const esc=x=>String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));const money=x=>'NT$'+Math.round(+x||0).toLocaleString();function status(t,col){$('sync').innerHTML=`<span class="dot" style="background:${col}"></span>${t}`}function nav(){$('nav').innerHTML=tabs.map(x=>`<button class="${tab===x[0]?'active':''}" onclick="tab='${x[0]}';render()">${x[1]}</button>`).join('')}async function q(t,o={}){let z=c.from(t).select('*');if(o.order)z=z.order(o.order,{ascending:false});if(o.eq)z=z.eq(o.eq[0],o.eq[1]);let {data,error}=await z;if(error){console.error(error);return []}return data||[]}async function upsert(t,row,conf){let z=await c.from(t).upsert(row,{onConflict:conf});if(z.error)alert(z.error.message);return !z.error}async function update(t,id,row){let z=await c.from(t).update(row).eq('id',id);if(z.error)alert(z.error.message)}
 async function overview(){let f=await q('monthly_finance',{order:'month'}),d=await q('investment_decisions',{order:'decision_date'}),t=await q('tasks',{order:'created_at'}),r=await q('research_assets',{order:'updated_at'}),x=f[0]||{},total=+x.total_assets||0,inc=+x.income||0,exp=+x.expense||0,inv=+x.etf_contribution||0,cash=+x.cash_savings||0,target=getGoal(),goal=Math.min(100,total/target*100),sr=inc?(inc-exp)/inc*100:0,ir=inc?inv/inc*100:0,ep=Math.min(100,cash/70000*100),done=t.filter(z=>z.status==='done').length;let strategy=cash<70000?'現階段：先把緊急預備金建立到 70,000，同時保持小額核心投入':'現階段：緊急預備金已達標，核心投入維持約 合理的核心投入／月，另留 2,000–4,000 現金彈性';$('app').innerHTML=`<section class="grid g4"><div class="card hero" style="grid-column:span 2"><div class="eyebrow">MILLION PROJECT / PHASE 01</div><div class="split" style="margin-top:7px"><div><div class="big">${money(total)}</div><div style="color:#cbd5e1">目前總資產</div></div><span class="pill" style="background:#ffffff14;color:#fff;border-color:#ffffff24">${goal.toFixed(1)}%</span></div><div class="bar" style="margin-top:14px;background:#334155"><i style="width:${goal}%"></i></div><div class="split tiny" style="color:#cbd5e1;margin-top:5px"><span>目標 ${money(target)}</span><span>差額 ${money(Math.max(0,target-total))}</span></div></div><div class="metric"><div class="label">本月儲蓄率</div><div class="num">${inc?sr.toFixed(1)+'%':'—'}</div><div class="tiny">收入扣除支出後留存</div></div><div class="metric"><div class="label">本月投資率</div><div class="num">${inc?ir.toFixed(1)+'%':'—'}</div><div class="tiny">投資／收入</div></div></section><section class="grid g3" style="margin-top:14px"><div class="card"><div class="split"><div><div class="k">緊急預備金</div><div class="v">${money(cash)}</div></div><span class="pill">目標 70,000</span></div><div class="bar" style="margin-top:10px"><i style="width:${ep}%"></i></div><div class="tiny" style="margin-top:5px">完成 ${ep.toFixed(0)}%</div></div><div class="card"><div class="k">本月建議</div><div class="recommend"><b>${esc(strategy)}</b><div class="tiny" style="margin-top:5px">先風險管理，再談報酬。網站中的配置建議會依你的實際收入、支出、現金部位動態計算。</div></div></div><div class="card"><div class="k">研究系統</div><div class="split" style="margin-top:9px"><span class="pill">研究 ${r.length}</span><span class="pill">決策 ${d.length}</span><span class="pill">任務 ${done}/${t.length}</span></div><div class="tiny" style="margin-top:9px">研究宇宙：上市／上櫃個股、ETF、主動式 ETF、債券、REIT、ETN、槓桿／反向等。</div></div></section><section class="grid g2" style="margin-top:14px"><div class="card"><div class="split"><h3 style="margin:0">🎯 本月作戰清單</h3><span class="pill">${done}/${t.length}</span></div>${t.slice(0,8).map(z=>`<label class="task"><input type="checkbox" ${z.status==='done'?'checked':''} onchange="update('tasks','${z.id}',{status:this.checked?'done':'todo'});overview()"><span><b>${esc(z.title)}</b><br><span class="tiny">${esc(z.priority||'P1')} · ${z.status==='done'?'完成':'待處理'}</span></span></label>`).join('')||'<div class="empty">尚未建立任務</div>'}</div><div class="card"><div class="split"><h3 style="margin:0">🧠 最近決策</h3><span class="pill">Evidence</span></div>${d.slice(0,5).map(z=>`<div class="task"><div style="width:100%"><div class="split"><b>${esc(z.symbol||'')}</b><span class="pill ${z.decision==='買'?'buy':z.decision==='觀察'?'watch':z.decision==='不買'?'no':''}">${esc(z.decision)}</span></div><div class="tiny" style="white-space:pre-wrap">${esc(z.rationale||'')}</div></div></div>`).join('')||'<div class="empty">尚無決策</div>'}</div></section>`}
-function allocation(income,expense,cash){
-  const available=Math.max(0,(+income||0)-(+expense||0));
+function allocation(income,expense,cash,livingBudget=27000){
+  const reserve=Math.max(+expense||0,+livingBudget||0);
+  const available=Math.max(0,(+income||0)-reserve);
   const target=70000,gap=Math.max(0,target-(+cash||0));
   if(available<=0)return{available,emergency:0,core:0,flex:0,gap,months:null};
   let emergency=cash<target?Math.min(gap,Math.max(1000,Math.round(available*0.30))):0;
@@ -64,37 +69,51 @@ async function monthly(){
  let a=await q('monthly_finance',{order:'month'});
  let existing=a.find(x=>(x.month||'').slice(0,7)===selected)||{};
  let entries=await q('finance_entries',{order:'entry_date'}); entries=entries.filter(z=>(z.month||'').slice(0,7)===selected);
- let ledgerIncome=entries.filter(z=>z.entry_type==='income').reduce((n,x)=>n+(+x.amount||0),0), ledgerExpense=entries.filter(z=>z.entry_type==='expense').reduce((n,x)=>n+(+x.amount||0),0);
- let inc=existing.income!=null?+existing.income:ledgerIncome, exp=existing.expense!=null?+existing.expense:ledgerExpense, cash=+existing.cash_savings||0, iv=(+existing.total_assets||0)-cash, buy=+existing.etf_contribution||0;
- $('app').innerHTML=`<section class="finance-layout">
- <div class="card">
-  <div class="section-title"><div><div class="section-kicker">MONTHLY FINANCE</div><h2>💰 每月財務</h2><p class="muted" style="margin:4px 0 0">先記錄「錢去哪裡」，再用數據決定薪資怎麼配置。</p></div><span class="pill">${selected}</span></div>
-  <div class="row3">
-   <div class="field"><label>月份</label><input id="m" type="month" value="${selected}" onchange="loadFinanceMonth()"></div>
-   <div class="field"><label>本月實領薪資</label><input id="inc" type="number" value="${inc||''}" placeholder="例如 48000"></div>
-   <div class="field"><label>本月總支出</label><input id="exp" type="number" value="${exp||''}" placeholder="可由明細自動帶入"></div>
-   <div class="field"><label>目前現金／存款</label><input id="cash" type="number" value="${cash||''}"></div>
-   <div class="field"><label>目前投資市值</label><input id="iv" type="number" value="${iv||''}"></div>
-   <div class="field"><label>本月實際投資</label><input id="buy" type="number" value="${buy||''}"></div>
+ let ledgerIncome=entries.filter(z=>z.entry_type==='income').reduce((n,x)=>n+(+x.amount||0),0), ledgerExpense=entries.filter(z=>z.entry_type==='expense').reduce((n,x)=>n+(+x.amount||0),0), ledgerSaving=entries.filter(z=>z.entry_type==='saving').reduce((n,x)=>n+(+x.amount||0),0), ledgerInvestment=entries.filter(z=>z.entry_type==='investment').reduce((n,x)=>n+(+x.amount||0),0);
+ let inc=ledgerIncome||(+existing.income||0), exp=ledgerExpense, cash=+existing.cash_savings||0, iv=(+existing.total_assets||0)-cash, buy=ledgerInvestment||(+existing.etf_contribution||0);
+ let livingBudget=+(localStorage.getItem('millionproject_living_budget')||27000);
+ let remaining=Math.max(0,inc-exp-ledgerSaving-ledgerInvestment), spendPct=livingBudget?Math.min(100,exp/livingBudget*100):0;
+ $('app').innerHTML=`<section class="card finance-head">
+  <div class="section-title"><div><div class="section-kicker">MONTHLY MONEY FLOW</div><h2>💰 每月財務</h2><p class="muted" style="margin:4px 0 0">只做三件事：① 設定本月預算與資產快照　② 記每筆金流　③ 看系統怎麼分配剩餘資金。</p></div><span class="pill">${selected}</span></div>
+  <div class="finance-kpis grid g4">
+   <div class="metric"><div class="label">本月收入</div><div class="num">${money(inc)}</div><div class="tiny">由收入明細自動彙總</div></div>
+   <div class="metric"><div class="label">本月生活支出</div><div class="num">${money(exp)}</div><div class="tiny">生活預算 ${money(livingBudget)} · 已用 ${spendPct.toFixed(0)}%</div><div class="progress"><i style="width:${spendPct}%"></i></div></div>
+   <div class="metric"><div class="label">本月已存＋已投資</div><div class="num">${money(ledgerSaving+ledgerInvestment)}</div><div class="tiny">存款 ${money(ledgerSaving)} · 投資 ${money(ledgerInvestment)}</div></div>
+   <div class="metric"><div class="label">尚未分配現金</div><div class="num">${money(remaining)}</div><div class="tiny">收入－支出－存款－投資</div></div>
   </div>
-  <div class="toolbar" style="margin-top:10px"><button class="btn main" onclick="saveMonth()">儲存本月</button><button class="btn ghost" onclick="previewAllocation()">🧠 重新計算配置</button></div>
-  <div class="status-note" style="margin-top:12px"><b>記帳邏輯：</b>每筆收入／支出會自動回寫本月統計；信用卡是付款方式，不是第二筆支出。</div>
- </div><div id="allocBox" class="card"><div class="empty">輸入薪資、支出與現金後，這裡會告訴你本月應該怎麼分錢。</div></div></section>
- <section class="card" style="margin-top:14px"><div class="section-title"><div><div class="section-kicker">LEDGER</div><h3>🧾 每筆收入／支出</h3><div class="tiny">用下拉選單選「這筆錢是幹嘛去的」；之後可以直接修改或刪除。</div></div><span class="pill">${selected}</span></div>
+ </section>
+ <section class="finance-layout" style="margin-top:14px">
+  <div class="card">
+   <div class="section-title"><div><div class="section-kicker">MONTH SETUP</div><h3>① 本月設定</h3><div class="tiny">這裡只放「規劃值／月底快照」，不再重複輸入支出與投資。</div></div></div>
+   <div class="row3">
+    <div class="field"><label>月份</label><input id="m" type="month" value="${selected}" onchange="loadFinanceMonth()"></div>
+    <div class="field"><label>生活預留預算</label><input id="lb" type="number" value="${livingBudget}" onchange="saveLivingBudget()"><div class="tiny">目前基準可先抓 27,000，可自行調整</div></div>
+    <div class="field"><label>目前現金／存款</label><input id="cash" type="number" value="${cash||''}" placeholder="月底或目前餘額"></div>
+    <div class="field"><label>目前投資市值</label><input id="iv" type="number" value="${iv||''}" placeholder="持倉目前總市值"></div>
+   </div>
+   <input id="inc" type="hidden" value="${inc||0}"><input id="exp" type="hidden" value="${exp||0}"><input id="buy" type="hidden" value="${buy||0}">
+   <div class="toolbar" style="margin-top:10px"><button class="btn main" onclick="saveMonth()">儲存資產快照</button><button class="btn ghost" onclick="previewAllocation()">重新計算配置</button></div>
+   <div class="status-note" style="margin-top:12px"><b>避免重複：</b>收入、支出、存款、投資都由下面的「金流明細」自動加總；這裡不再手動重複填。</div>
+  </div>
+  <div id="allocBox" class="card"><div class="empty">系統正在計算本月配置…</div></div>
+ </section>
+ <section class="card" style="margin-top:14px"><div class="section-title"><div><div class="section-kicker">LEDGER</div><h3>② 記一筆金流</h3><div class="tiny">所有錢只記一次：消費＝支出；轉進預備金＝存款；買 ETF／股票＝投資；信用卡只是付款方式。</div></div><span class="pill">${selected}</span></div>
   <div class="entry-form">
    <div class="field"><label>日期</label><input id="ed" type="date" value="${selected}-01"></div>
-   <div class="field"><label>類型</label><select id="et" onchange="refreshEntryCategories()"><option value="expense">支出</option><option value="income">收入</option><option value="saving">存款／留存</option><option value="investment">投資</option></select></div>
-   <div class="field"><label>用途分類</label><select id="ec"></select></div>
+   <div class="field"><label>這筆是</label><select id="et" onchange="refreshEntryCategories()"><option value="expense">支出</option><option value="income">收入</option><option value="saving">存款／留存</option><option value="investment">投資</option></select></div>
+   <div class="field"><label>用途</label><select id="ec"></select></div>
    <div class="field"><label>金額</label><input id="ea" type="number" min="0" placeholder="0"></div>
    <div class="field"><label>付款／來源</label><select id="epm"><option>銀行轉帳／現金</option><option>台新</option><option>富邦</option><option>國泰</option><option>其他信用卡</option><option>其他</option></select></div>
    <button class="btn main" onclick="addFinanceEntry()">＋ 新增</button>
   </div>
-  <div class="field" style="margin-top:9px"><label>備註</label><input id="en" placeholder="例如：9 月東京住宿、父母生活費、超市採買"></div>
+  <div class="field" style="margin-top:9px"><label>備註（可省略）</label><input id="en" placeholder="例如：房租、孝親、0050 定期定額"></div>
   <div id="entrySummary" style="margin-top:14px"></div>
-  <div class="scroll" style="margin-top:8px"><table class="entry-table"><thead><tr><th>日期</th><th>類型</th><th>分類</th><th>金額</th><th>付款方式</th><th>備註</th><th>操作</th></tr></thead><tbody id="entryRows"></tbody></table></div>
+  <div class="scroll" style="margin-top:8px"><table class="entry-table"><thead><tr><th>日期</th><th>類型</th><th>用途</th><th>金額</th><th>付款方式</th><th>備註</th><th>操作</th></tr></thead><tbody id="entryRows"></tbody></table></div>
  </section>
- <section class="card" style="margin-top:14px"><h3>📈 歷月財務軌跡</h3><div class="tiny">每筆月份資料都可以修改或刪除，打錯不需要重建整個月份。</div><div class="scroll" style="margin-top:8px"><table class="table"><tr><th>月份</th><th>收入</th><th>支出</th><th>可用</th><th>現金</th><th>投資市值</th><th>核心投入</th><th>總資產</th><th>操作</th></tr>${a.map(z=>`<tr><td>${esc((z.month||'').slice(0,7))}</td><td>${money(z.income)}</td><td>${money(z.expense)}</td><td>${money(z.investable)}</td><td>${money(z.cash_savings)}</td><td>${money((+z.total_assets||0)-(+z.cash_savings||0))}</td><td>${money(z.etf_contribution)}</td><td>${money(z.total_assets)}</td><td><div class="research-actions"><button class="btn ghost" onclick="editMonth('${z.id}')">編輯</button><button class="btn danger-btn" onclick="deleteMonth('${z.id}')">刪除</button></div></td></tr>`).join('')||'<tr><td colspan="9" class="empty">尚無資料</td></tr>'}</table></div></section>`;refreshEntryCategories();renderEntryTable(entries);previewAllocation();
+ <section class="card" style="margin-top:14px"><div class="section-title"><div><div class="section-kicker">MONTHLY CLOSE</div><h3>③ 歷月結算</h3><div class="tiny">只有月底資產快照與每月總結果留在這裡。明細若打錯，直接在上面修改／刪除。</div></div></div><div class="scroll" style="margin-top:8px"><table class="table"><tr><th>月份</th><th>收入</th><th>支出</th><th>現金</th><th>投資市值</th><th>當月投資</th><th>總資產</th><th>操作</th></tr>${a.map(z=>`<tr><td>${esc((z.month||'').slice(0,7))}</td><td>${money(z.income)}</td><td>${money(z.expense)}</td><td>${money(z.cash_savings)}</td><td>${money((+z.total_assets||0)-(+z.cash_savings||0))}</td><td>${money(z.etf_contribution)}</td><td><b>${money(z.total_assets)}</b></td><td><div class="research-actions"><button class="btn ghost" onclick="editMonth('${z.id}')">編輯快照</button><button class="btn danger-btn" onclick="deleteMonth('${z.id}')">刪除月份</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty">尚無資料</td></tr>'}</table></div></section>`;
+ refreshEntryCategories();renderEntryTable(entries);previewAllocation();
 }
+function saveLivingBudget(){let n=Math.max(0,+$('lb').value||27000);localStorage.setItem('millionproject_living_budget',String(n));previewAllocation()}
 async function saveMonth(){
   if(!u)return alert('請先登入');
   const month=$('m')?.value;
@@ -114,6 +133,8 @@ async function syncFinanceSummaryFromEntries(month, entries){
   const es=entries||[];
   const income=es.filter(x=>x.entry_type==='income').reduce((n,x)=>n+(+x.amount||0),0);
   const expense=es.filter(x=>x.entry_type==='expense').reduce((n,x)=>n+(+x.amount||0),0);
+  const saving=es.filter(x=>x.entry_type==='saving').reduce((n,x)=>n+(+x.amount||0),0);
+  const investment=es.filter(x=>x.entry_type==='investment').reduce((n,x)=>n+(+x.amount||0),0);
   const existing=(await q('monthly_finance',{order:'month'})).find(x=>(x.month||'').slice(0,7)===month)||{};
   const row={
     user_id:u.id,month:month+'-01',
@@ -121,7 +142,7 @@ async function syncFinanceSummaryFromEntries(month, entries){
     cash_savings:+existing.cash_savings||0,
     emergency_fund:+existing.emergency_fund||0,
     total_assets:+existing.total_assets||0,
-    etf_contribution:+existing.etf_contribution||0,
+    etf_contribution:investment,
     notes:existing.notes||'',
     updated_at:new Date().toISOString()
   };
@@ -147,18 +168,19 @@ async function saveMonthEdit(id){let month=$('mm_month').value;if(!month)return 
 function closeModal(){let x=$('monthModal');if(x)x.remove()}
 async function deleteMonth(id){if(!confirm('確定刪除這個月份的財務紀錄？'))return;let z=await c.from('monthly_finance').delete().eq('id',id);if(z.error)return alert(z.error.message);monthly()}
 function previewAllocation(){
-  const income=+$('inc').value||0,expense=+$('exp').value||0,cash=+$('cash').value||0;
-  const a=allocation(income,expense,cash),available=a.available;
-  const warning=available<=0?'⚠️ 本月沒有可分配的剩餘現金；先確認收入與支出。':expense>28400?'⚠️ 支出高於目前基準上限 28,400，先檢查非必要支出。':'✅ 配置同時保留安全墊、投資與現金，不會把全部剩餘薪資塞進預備金。';
+  const income=+$('inc').value||0,expense=+$('exp').value||0,cash=+$('cash').value||0,livingBudget=+$('lb')?.value||27000;
+  const a=allocation(income,expense,cash,livingBudget),reserve=Math.max(expense,livingBudget),available=a.available;
+  const warning=income<=0?'先記一筆薪資／收入，系統才會開始配置。':expense>livingBudget?'⚠️ 本月生活支出已超過預留預算，先暫停增加非必要投資。':'✅ 先保留生活費，再分配預備金、投資與現金彈性。';
   if(!$('allocBox'))return;
-  $('allocBox').innerHTML=`<div class="section-kicker">SMART ALLOCATION</div><h3 style="margin:4px 0 6px">本月剩餘現金怎麼分</h3><p class="muted" style="margin:0 0 10px">可分配＝收入－支出。預備金不足時只拿一部分補安全墊，其餘維持投資與現金彈性。</p>
+  $('allocBox').innerHTML=`<div class="section-kicker">SMART ALLOCATION</div><h3 style="margin:4px 0 6px">本月薪資怎麼分</h3><p class="muted" style="margin:0 0 10px">不再用「收入－目前已花」誤判可投資金額；系統會先把整月生活預算保留下來。</p>
   <div class="budget-grid">
-   <div class="budget-card"><div class="label">可分配</div><div class="amt">${money(available)}</div><div class="hint">收入扣除支出</div></div>
-   <div class="budget-card"><div class="label">緊急預備金</div><div class="amt">${money(a.emergency)}</div><div class="hint">${cash<70000?`距目標還差 ${money(a.gap)}`:'已達 70,000'}</div></div>
-   <div class="budget-card"><div class="label">核心投資</div><div class="amt">${money(a.core)}</div><div class="hint">${cash<70000?'預備金未達標仍保留投資習慣':'預備金達標後提高投資比重'}</div></div>
-   <div class="budget-card"><div class="label">現金彈性</div><div class="amt">${money(a.flex)}</div><div class="hint">突發支出／下月銜接</div></div>
+   <div class="budget-card"><div class="label">生活費先保留</div><div class="amt">${money(reserve)}</div><div class="hint">預算 ${money(livingBudget)}；已花 ${money(expense)}</div></div>
+   <div class="budget-card"><div class="label">補緊急預備金</div><div class="amt">${money(a.emergency)}</div><div class="hint">${cash<70000?`距 70,000 還差 ${money(a.gap)}`:'安全墊已達標'}</div></div>
+   <div class="budget-card"><div class="label">核心投資</div><div class="amt">${money(a.core)}</div><div class="hint">以核心 ETF 為主；不因短期新聞追高</div></div>
+   <div class="budget-card"><div class="label">現金彈性</div><div class="amt">${money(a.flex)}</div><div class="hint">下月銜接／突發支出／機會金</div></div>
   </div>
-  <div class="call" style="margin-top:12px"><b>${esc(warning)}</b><br><span class="muted">${a.months?`依目前補充速度，預備金約 ${a.months} 個月可達標。`:cash>=70000?'預備金已完成，重點轉向投資與現金流。':'請先補完整收入與支出資料。'}</span></div><div class="tiny" style="margin-top:10px">配置不是固定比例：預備金不足才補安全墊；達標後提高投資比重，並保留現金彈性。</div>`;
+  <div class="call" style="margin-top:12px"><b>${esc(warning)}</b><br><span class="muted">薪資 ${money(income)} − 生活預留 ${money(reserve)} ＝ 可配置 ${money(available)}。</span></div>
+  <div class="tiny" style="margin-top:10px">原則：生活費先留 → 預備金補到目標 → 核心投資 → 保留彈性現金。預備金不是把全部剩餘薪資吸走。</div>`;
 }
 async function portfolio(){let a=await q('portfolio',{order:'updated_at'}), totalCost=a.reduce((s,x)=>s+(+x.quantity||0)*(+x.avg_cost||0),0), totalValue=a.reduce((s,x)=>s+(+x.current_value||((+x.quantity||0)*(+x.current_price||0))),0), pnl=totalValue-totalCost, pct=totalCost?pnl/totalCost*100:0;let rows='';for(const x of a){let qx=await quote(x.symbol),price=qx?+qx.price:+x.current_price||0,val=(+x.quantity||0)*price,cost=(+x.quantity||0)*(+x.avg_cost||0),rp=cost?((val-cost)/cost*100):0;rows+=`<tr><td><b>${esc(x.symbol)}</b><br><span class="tiny">${esc(x.name||'')}</span></td><td>${esc(x.asset_type||'')}</td><td>${(+x.quantity||0).toLocaleString()}</td><td>${money(x.avg_cost)}</td><td>${price?money(price):'—'}</td><td>${price?money(val):money(x.current_value)}</td><td class="${rp>=0?'up':'down'}">${rp>=0?'+':''}${rp.toFixed(2)}%</td><td><button class="btn ghost" onclick="editHolding('${x.id}')">編輯</button> <button class="btn danger-btn" onclick="deleteHolding('${x.id}')">刪除</button></td></tr>`}$('app').innerHTML=`<section class="grid g4"><div class="metric"><div class="label">持倉成本</div><div class="num">${money(totalCost)}</div></div><div class="metric"><div class="label">目前市值</div><div class="num">${money(totalValue)}</div></div><div class="metric"><div class="label">未實現損益</div><div class="num ${pnl>=0?'up':'down'}">${pnl>=0?'+':''}${money(pnl)}</div></div><div class="metric"><div class="label">報酬率</div><div class="num ${pct>=0?'up':'down'}">${pct>=0?'+':''}${pct.toFixed(2)}%</div></div></section><section class="card" style="margin-top:14px"><div class="split"><div><div class="eyebrow" style="color:var(--blue)">PORTFOLIO CONTROL</div><h2 style="margin:5px 0">📊 投資組合</h2><p class="muted">把「持有什麼、成本多少、現在值多少」與研究／決策分開管理。報酬率僅為快照，不代表未來績效。</p></div><button class="btn main" onclick="addHolding()">＋ 新增持倉</button></div><div class="scroll" style="margin-top:12px"><table class="table"><tr><th>標的</th><th>類別</th><th>數量</th><th>均價</th><th>現價</th><th>市值</th><th>報酬</th><th>操作</th></tr>${rows||'<tr><td colspan="8" class="empty">尚無持倉。先建立第一筆持倉，之後再把研究結論與實際部位連起來。</td></tr>'}</table></div></section><section class="card" style="margin-top:14px"><div class="status-note"><b>配置原則：</b>投資組合頁只回答「我現在持有什麼」；市場研究頁回答「現在值得不值得研究／買」；決策紀錄回答「當時為什麼做這個判斷」。三者分離，才能真正複盤。</div></section>`}
 function addHolding(){ $('app').insertAdjacentHTML('beforeend',`<div class="modal-backdrop" id="holdModal" onclick="if(event.target.id==='holdModal')closeModal()"><div class="modal"><div class="modal-head"><h3>＋ 新增持倉</h3><button class="btn ghost" onclick="closeModal()">關閉</button></div><div class="row3"><div class="field"><label>代號</label><input id="hs" placeholder="例如 0050"></div><div class="field"><label>名稱</label><input id="hn" placeholder="例如 元大台灣50"></div><div class="field"><label>類別</label><select id="ht"><option>ETF</option><option>上市個股</option><option>上櫃個股</option><option>債券/債券ETF</option><option>REIT/不動產</option><option>其他</option></select></div></div><div class="row3" style="margin-top:10px"><div class="field"><label>持有數量</label><input id="hq" type="number" step="any"></div><div class="field"><label>平均成本</label><input id="hc" type="number" step="any"></div><div class="field"><label>備註</label><input id="hnote"></div></div><div class="actions"><button class="btn main" onclick="saveHolding()">儲存</button><button class="btn ghost" onclick="closeModal()">取消</button></div></div></div>`)}
