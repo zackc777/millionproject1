@@ -46,6 +46,64 @@
 @media(max-width:850px){.emergency-stats{grid-template-columns:1fr 1fr}.money-status{grid-template-columns:1fr 1fr}.progress-row{grid-template-columns:90px 1fr 82px}}
 @media(max-width:520px){.emergency-stats{grid-template-columns:1fr 1fr}.money-status{grid-template-columns:1fr}.progress-row{grid-template-columns:82px 1fr 78px}.flow-legend{gap:8px}.emergency-number{font-size:30px}}
 </style>
+
+<style id="v8-month-center-css">
+/* ===== millionproject v8 · intuitive month center ===== */
+.month-center{position:relative;overflow:hidden}
+.month-center:before{content:"";position:absolute;inset:0 auto auto 0;width:100%;height:4px;background:linear-gradient(90deg,#2563eb,#7c3aed,#14b8a6)}
+.month-center-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.month-title-main{font-size:28px;font-weight:950;line-height:1.15;letter-spacing:-.03em;margin-top:3px}
+.month-title-sub{font-size:12px;color:var(--muted);margin-top:5px}
+.month-switcher{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.month-switcher select{border:1px solid var(--line);background:#fff;border-radius:11px;padding:9px 12px;font-weight:850;min-width:150px}
+.month-nav-btn{width:40px;height:40px;border:1px solid var(--line);background:#fff;border-radius:12px;cursor:pointer;font-weight:950;font-size:18px}
+.month-nav-btn:hover,.month-year-tile:hover,.year-month-card:hover{border-color:#93c5fd;background:#f8fbff}
+.month-year-bar{display:flex;gap:8px;overflow-x:auto;padding:3px 1px 8px;margin-top:15px;scrollbar-width:thin}
+.month-year-tile{min-width:84px;border:1px solid var(--line);background:#fff;border-radius:14px;padding:9px 10px;cursor:pointer;text-align:left;transition:.15s ease}
+.month-year-tile.active{border-color:#60a5fa;background:#eff6ff;box-shadow:0 0 0 2px #dbeafe inset}
+.month-year-tile .mname{font-size:12px;font-weight:900}
+.month-year-tile .mstate{font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap}
+.month-year-tile .mdot{width:7px;height:7px;border-radius:99px;background:#cbd5e1;display:inline-block;margin-right:5px}
+.month-year-tile.has-data .mdot{background:#10b981}
+.month-year-tile.active .mdot{background:#2563eb}
+.month-compare{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:10px}
+.month-compare-box{border:1px solid var(--line);background:#f8fafc;border-radius:14px;padding:11px 12px}
+.month-compare-box .label{font-size:10px;color:var(--muted);font-weight:850}
+.month-compare-box .mainv{font-size:18px;font-weight:950;margin-top:2px}
+.month-compare-box .delta{font-size:10px;color:var(--muted);margin-top:2px}
+.month-workflow-note{margin-top:11px;padding:10px 12px;border-radius:12px;background:#f8fbff;border:1px solid #dbeafe;font-size:12px}
+.year-summary-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.year-summary-controls{display:flex;align-items:center;gap:7px}
+.year-summary-controls button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 10px;cursor:pointer;font-weight:850}
+.year-summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:13px}
+.year-month-card{border:1px solid var(--line);background:#fff;border-radius:16px;padding:14px;text-align:left;cursor:pointer;transition:.15s ease}
+.year-month-card.active{border-color:#60a5fa;background:#f8fbff;box-shadow:0 0 0 2px #dbeafe inset}
+.year-month-card.empty-month{background:#fbfcfe;opacity:.75}
+.year-month-card .ym-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.year-month-card .ym-name{font-size:15px;font-weight:950}
+.year-month-card .ym-status{font-size:10px;font-weight:850;padding:4px 7px;border-radius:999px;background:#f1f5f9;color:#64748b}
+.year-month-card.has-data .ym-status{background:#ecfdf5;color:#047857}
+.year-month-card .ym-kpis{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}
+.year-month-card .ym-kpi{padding:8px 9px;border-radius:11px;background:#f8fafc}
+.year-month-card .ym-kpi span{display:block;font-size:9px;color:var(--muted);font-weight:850}
+.year-month-card .ym-kpi b{display:block;font-size:13px;margin-top:1px}
+.year-month-card .ym-bar{height:7px;border-radius:99px;background:#e8edf5;overflow:hidden;margin-top:10px}
+.year-month-card .ym-bar i{display:block;height:100%;background:linear-gradient(90deg,#f97316,#10b981,#6366f1);border-radius:99px}
+.month-history-details{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.month-history-details summary{cursor:pointer;font-weight:850;color:#475569}
+.month-snapshot-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;background:#eef2ff;color:#4338ca;font-size:10px;font-weight:900}
+@media(max-width:1000px){.month-compare{grid-template-columns:1fr 1fr}.year-summary-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:700px){
+ .month-center-head,.year-summary-head{flex-direction:column}
+ .month-switcher{justify-content:flex-start;width:100%}
+ .month-switcher select{flex:1;min-width:0}
+ .month-title-main{font-size:24px}
+ .month-compare{grid-template-columns:1fr 1fr}
+ .year-summary-grid{grid-template-columns:1fr}
+ .month-year-tile{min-width:74px}
+}
+</style>
+
 </head><body><div class="wrap"><header class="top"><div class="brand"><div class="logo">MP</div><div><h1>millionproject.</h1><div class="sub">你的第一個 100 萬｜理財 × 資產配置 × 全市場研究 × 決策</div></div></div><div class="sync" id="sync"><span class="dot"></span>連線中</div></header><div id="nav" class="nav"></div><main id="app"></main><div class="footer">millionproject. · 研究是研究，投資是投資；重大判斷保留 Fact / Analysis / Risk / Reference。</div></div><script>
 const U='https://jypukgxllsilctsmfxmw.supabase.co',K='sb_publishable_u7KFH6kyuuJZies_avPwug_TXWnb6A8';let c,u,tab='o';const tabs=[['o','總覽'],['m','每月財務'],['c','信用卡'],['p','投資組合'],['r','市場研究'],['d','決策紀錄'],['l','投資課'],['s','設定']];const $=x=>document.getElementById(x);
 const DEFAULT_GOAL=1000000;
@@ -723,5 +781,249 @@ async function saveInvestmentBuy(){
 }
 // ===== end v7 overrides =====
 
+
+// ===== millionproject v8 · intuitive month center =====
+let financeMonthCursor = null;
+let financeYearCursor = null;
+
+function systemFinanceMonth(){return new Date().toISOString().slice(0,7)}
+function monthOffsetKey(m,delta){
+  const [y,mo]=monthKey(m).split('-').map(Number);
+  const d=new Date(y,mo-1+delta,1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function financeMonthLabel(m){
+  const [y,mo]=monthKey(m).split('-').map(Number);
+  return `${y} 年 ${mo} 月`;
+}
+function selectedMonth(){
+  return monthKey(financeMonthCursor||$('salary_month')?.value||$('m')?.value||systemFinanceMonth());
+}
+function setFinanceMonth(m){
+  financeMonthCursor=monthKey(m)||systemFinanceMonth();
+  financeYearCursor=Number(financeMonthCursor.slice(0,4));
+  monthly();
+}
+function shiftFinanceMonth(delta){setFinanceMonth(monthOffsetKey(selectedMonth(),delta))}
+function goCurrentFinanceMonth(){setFinanceMonth(systemFinanceMonth())}
+function shiftFinanceYear(delta){
+  financeYearCursor=(financeYearCursor||Number(selectedMonth().slice(0,4)))+delta;
+  const mo=selectedMonth().slice(5,7);
+  setFinanceMonth(`${financeYearCursor}-${mo}`);
+}
+function ledgerStatsForMonth(allEntries,m){
+  const rows=allEntries.filter(x=>isRealFinanceEntry(x)&&monthKey(x.month)===m);
+  const sumType=t=>rows.filter(x=>x.entry_type===t).reduce((n,x)=>n+(+x.amount||0),0);
+  return {month:m,rows,count:rows.length,income:sumType('income'),expense:sumType('expense'),saving:sumType('saving'),investment:sumType('investment')};
+}
+function monthDelta(cur,prev){
+  const d=(+cur||0)-(+prev||0);
+  if(!prev&&!cur)return '—';
+  return `${d>0?'+':''}${money(d)} 相比上月`;
+}
+function monthOptionList(months,selected){
+  const set=new Set(months.filter(Boolean));set.add(selected);set.add(systemFinanceMonth());
+  return [...set].sort().reverse();
+}
+function historySnapshotForMonth(snapshotMap,stats,m){
+  const x=snapshotMap[m]||{};
+  const hasSnapshot=Object.keys(x).length>0;
+  const cash=+x.cash_savings||0,total=+x.total_assets||0,emergency=+x.emergency_fund||0;
+  return {
+    hasSnapshot,
+    income:stats.income||(+x.income||0),
+    expense:stats.expense||(+x.expense||0),
+    saving:stats.saving,
+    investment:stats.investment||(+x.etf_contribution||0),
+    emergency,
+    cash,
+    total,
+    investmentValue:Math.max(0,total-cash)
+  };
+}
+function monthStatusText(m,stats,snap){
+  if(!stats.count&&!snap.hasSnapshot)return '尚未開始';
+  if(m===systemFinanceMonth())return '本月進行中';
+  return snap.hasSnapshot?'有月度快照':'已有紀錄';
+}
+
+async function monthly(){
+  await loadEmergencyGoal();
+
+  let selected=selectedMonth(); financeMonthCursor=selected;
+  financeYearCursor=financeYearCursor||Number(selected.slice(0,4));
+
+  let snapshots=await q('monthly_finance',{order:'month'});
+  let snapshotMap={}; snapshots.forEach(x=>snapshotMap[monthKey(x.month)]=x);
+
+  let all=(await q('finance_entries',{order:'entry_date'})).filter(isRealFinanceEntry);
+  let entries=all.filter(z=>monthKey(z.month)===selected);
+  let existing=snapshotMap[selected]||{};
+  let salaryEntry=entries.find(z=>z.entry_type==='income'&&z.category==='薪資'&&String(z.note||'').includes('[MONTHLY_SALARY]'));
+  let salary=salaryEntry?+salaryEntry.amount||0:(+existing.income||0);
+
+  let state=await moneyEngine(selected);
+  const income=state.monthIncome,expense=state.monthExpense,saving=state.monthSaving,investment=state.monthInvestment,remaining=state.monthUnallocated;
+  let b=getBudgetProfile(),planned=plannedLivingTotal(),plan=allocation(income,expense,state.emergency,planned),spendPct=planned?Math.min(100,expense/planned*100):0,eTarget=getEmergencyGoalCached();
+  let fixed=await fixedTemplates(),templateKeys=new Set(fixed.map(x=>((String(x.note||'').match(/\[KEY:([^\]]+)\]/)||[])[1])).filter(Boolean));
+  const p=monthFlowParts(state),incomeBase=Math.max(income,expense+saving+investment+Math.max(0,remaining),1),unalloc=Math.max(0,remaining);
+
+  const allMonths=monthOptionList([
+    ...all.map(x=>monthKey(x.month)),
+    ...snapshots.map(x=>monthKey(x.month))
+  ],selected);
+
+  const prevMonth=monthOffsetKey(selected,-1);
+  const curStats=ledgerStatsForMonth(all,selected);
+  const prevStats=ledgerStatsForMonth(all,prevMonth);
+  const curSummary=historySnapshotForMonth(snapshotMap,curStats,selected);
+  const prevSummary=historySnapshotForMonth(snapshotMap,prevStats,prevMonth);
+
+  const selectedYear=Number(selected.slice(0,4));
+  const yearTiles=Array.from({length:12},(_,i)=>{
+    const m=`${selectedYear}-${String(i+1).padStart(2,'0')}`,s=ledgerStatsForMonth(all,m),snap=historySnapshotForMonth(snapshotMap,s,m);
+    const has=s.count||snap.hasSnapshot;
+    return `<button class="month-year-tile ${m===selected?'active':''} ${has?'has-data':''}" onclick="setFinanceMonth('${m}')">
+      <div class="mname"><span class="mdot"></span>${i+1} 月</div>
+      <div class="mstate">${has?(s.income?money(s.income):'有紀錄'):'—'}</div>
+    </button>`;
+  }).join('');
+
+  const monthSelectOptions=allMonths.map(m=>`<option value="${m}" ${m===selected?'selected':''}>${financeMonthLabel(m)}</option>`).join('');
+
+  const historyCards=Array.from({length:12},(_,i)=>{
+    const m=`${selectedYear}-${String(i+1).padStart(2,'0')}`,s=ledgerStatsForMonth(all,m),snap=historySnapshotForMonth(snapshotMap,s,m),has=s.count||snap.hasSnapshot;
+    const allocated=s.income?Math.min(100,Math.max(0,(s.expense+s.saving+s.investment)/s.income*100)):0;
+    return `<button class="year-month-card ${m===selected?'active':''} ${has?'has-data':'empty-month'}" onclick="setFinanceMonth('${m}')">
+      <div class="ym-head"><div class="ym-name">${i+1} 月</div><span class="ym-status">${monthStatusText(m,s,snap)}</span></div>
+      <div class="ym-kpis">
+        <div class="ym-kpi"><span>收入</span><b>${has?money(snap.income):'—'}</b></div>
+        <div class="ym-kpi"><span>支出</span><b>${has?money(snap.expense):'—'}</b></div>
+        <div class="ym-kpi"><span>存＋投</span><b>${has?money(snap.saving+snap.investment):'—'}</b></div>
+        <div class="ym-kpi"><span>總資產</span><b>${snap.hasSnapshot?money(snap.total):'—'}</b></div>
+      </div>
+      <div class="ym-bar"><i style="width:${allocated}%"></i></div>
+    </button>`;
+  }).join('');
+
+  const isPast=selected<systemFinanceMonth(),hasPastSnapshot=!!snapshotMap[selected];
+  const displayEmergency=isPast&&hasPastSnapshot?(+existing.emergency_fund||0):state.emergency;
+  const displayCashLike=isPast&&hasPastSnapshot?(+existing.cash_savings||0):state.cashLike;
+  const displayInvestment=isPast&&hasPastSnapshot?Math.max(0,(+existing.total_assets||0)-(+existing.cash_savings||0)):state.investmentValue;
+  const displayOtherCash=Math.max(0,displayCashLike-displayEmergency);
+  const displayTotal=isPast&&hasPastSnapshot?(+existing.total_assets||0):state.totalAssets;
+
+  $('app').innerHTML=`
+  <section class="card month-center">
+    <div class="month-center-head">
+      <div>
+        <div class="section-kicker">MONTH CENTER · 每月財務中心</div>
+        <div class="month-title-main">📅 ${financeMonthLabel(selected)}</div>
+        <div class="month-title-sub">所有輸入、記帳、存款、投資與資產都綁定這個月份。切月份只切視角，不會改掉其他月份資料。</div>
+      </div>
+      <div class="month-switcher">
+        <button class="month-nav-btn" onclick="shiftFinanceMonth(-1)" title="上一個月">‹</button>
+        <select onchange="setFinanceMonth(this.value)">${monthSelectOptions}</select>
+        <button class="month-nav-btn" onclick="shiftFinanceMonth(1)" title="下一個月">›</button>
+        <button class="btn ghost" onclick="goCurrentFinanceMonth()">回到本月</button>
+      </div>
+    </div>
+
+    <div class="month-year-bar">${yearTiles}</div>
+
+    <div class="month-compare">
+      <div class="month-compare-box"><div class="label">本月收入</div><div class="mainv">${money(curSummary.income)}</div><div class="delta">${monthDelta(curSummary.income,prevSummary.income)}</div></div>
+      <div class="month-compare-box"><div class="label">本月支出</div><div class="mainv">${money(curSummary.expense)}</div><div class="delta">${monthDelta(curSummary.expense,prevSummary.expense)}</div></div>
+      <div class="month-compare-box"><div class="label">本月存款</div><div class="mainv">${money(curSummary.saving)}</div><div class="delta">${monthDelta(curSummary.saving,prevSummary.saving)}</div></div>
+      <div class="month-compare-box"><div class="label">本月投資</div><div class="mainv">${money(curSummary.investment)}</div><div class="delta">${monthDelta(curSummary.investment,prevSummary.investment)}</div></div>
+    </div>
+    <div class="month-workflow-note"><b>使用方式：</b>平常只要在上面切到月份 → 輸入該月薪資 → 記真正發生的金流。下方的月度總覽會自動累積，不需要再另外建立「每月記錄」。</div>
+  </section>
+
+  <section class="card salary-start" style="margin-top:14px">
+    <div class="section-title"><div><div class="section-kicker">STEP 1 · INCOME</div><h2>① ${financeMonthLabel(selected)}先從實領薪資開始</h2><p class="muted" style="margin:4px 0 0">月份已由上方「每月財務中心」決定，這裡不再讓你重複選月份。</p></div><span class="pill">${selected}</span></div>
+    <input id="salary_month" type="hidden" value="${selected}">
+    <div class="row" style="align-items:end">
+      <div class="field"><label>本月實領薪資</label><input id="salary_input" type="number" min="0" value="${salary||''}" placeholder="例如 50000"><div class="tiny">只填真正入帳薪資；獎金／兼職收入之後另外記一筆。</div></div>
+      <button class="btn main" style="height:44px" onclick="saveSalaryPlan()">儲存本月薪資並開始配置 →</button>
+    </div>
+    ${salary>0?`<div class="call" style="margin-top:12px"><b>${financeMonthLabel(selected)}理財已啟動：${money(salary)}</b><br><span class="muted">後續支出、存款與投資都會自動歸到這個月份。</span></div>`:`<div class="status-note" style="margin-top:12px"><b>這個月尚未開始。</b> 輸入實領薪資後，系統才會啟動本月配置。</div>`}
+  </section>
+
+  <section class="finance-layout" style="margin-top:14px;${salary>0?'':'opacity:.55;pointer-events:none'}">
+    <div class="card">
+      <div class="section-title"><div><div class="section-kicker">STEP 2 · LIFE FIRST</div><h3>② 先保留整月生活責任</h3><div class="tiny">固定支出設定一次；變動項目是預算上限，不代表已經花掉。</div></div><span class="pill">預留 ${money(planned)}</span></div>
+      <div class="budget-grid">
+        ${[['rent','房租／住宿'],['family','父母／家庭'],['telecom','電信／網路'],['gym','健身／健康'],['daily','餐飲／交通／日常'],['leisure','娛樂／治裝彈性']].map(([k,label])=>`<div class="budget-card"><div class="split"><div class="label">${label}</div>${FIXED_KEYS.includes(k)?`<label class="tiny"><input id="fix_${k}" type="checkbox" ${templateKeys.has(k)?'checked':''}> 每月固定</label>`:'<span class="tiny">預算上限</span>'}</div><input class="mini-input" id="bp_${k}" type="number" value="${b[k]}" onchange="saveBudgetProfile()"></div>`).join('')}
+      </div>
+      <div class="fixed-actions"><button class="btn ghost" onclick="saveFixedTemplates()">💾 儲存固定支出模板</button><button class="btn soft" onclick="applyFixedExpenses()">⚡ 一鍵加入 ${selected} 固定支出</button></div>
+      <div class="status-note" style="margin-top:10px"><b>固定項目只設定一次。</b> 每個月切到該月後按「一鍵加入」，系統會防止同月重複加入。</div>
+    </div>
+    <div id="allocBox" class="card"><div class="empty">系統正在計算本月配置…</div></div>
+  </section>
+
+  <section class="grid g2" style="margin-top:14px;${salary>0?'':'opacity:.5;pointer-events:none'}">
+    <div class="card"><div class="section-title"><div><div class="section-kicker">STEP 3 · LIVE FLOW</div><h3>③ ${financeMonthLabel(selected)}資金流</h3></div><span class="live-badge">即時</span></div>${flowVisualHtml(state)}<div style="margin-top:10px">${progressRow('已支出',expense,incomeBase,'#f97316')}${progressRow('預備金',p.emergency,incomeBase,'#10b981')}${progressRow('其他存款',p.otherSaving,incomeBase,'#14b8a6')}${progressRow('已投資',investment,incomeBase,'#6366f1')}${progressRow('待配置',unalloc,incomeBase,'#94a3b8')}</div></div>
+    <div class="card"><div class="section-title"><div><div class="section-kicker">SMART ALLOCATION</div><h3>本月應該怎麼分</h3></div><span class="pill">${esc(plan.stage)}</span></div><div class="smart-grid" style="grid-template-columns:1fr 1fr"><div class="smart-card"><div class="title">生活預留</div><div class="value">${money(planned)}</div></div><div class="smart-card"><div class="title">建議預備金</div><div class="value">${money(plan.emergency)}</div></div><div class="smart-card"><div class="title">建議核心投資</div><div class="value">${money(plan.core)}</div></div><div class="smart-card"><div class="title">現金彈性</div><div class="value">${money(plan.flex)}</div></div></div><div class="smart-alert ${state.emergency<eTarget?'warn':investment<plan.core?'':'good'}" style="margin-top:12px"><b>${state.emergency<eTarget?`安全墊總額還差 ${money(Math.max(0,eTarget-state.emergency))}`:investment<plan.core?`核心投資本月尚可執行 ${money(Math.max(0,plan.core-investment))}`:'本月配置已接近完成，不必為了湊數追高。'}</b></div></div>
+  </section>
+
+  ${emergencyPanelHtml(state,eTarget)}
+
+  <section class="card" id="ledgerBox" style="margin-top:14px;${salary>0?'':'opacity:.5;pointer-events:none'}">
+    <div class="section-title"><div><div class="section-kicker">STEP 4 · ACTUAL LEDGER</div><h3>④ 只記真正發生的金流</h3><div class="tiny">這裡新增、修改或刪除後，上面的色條、預備金、首頁與當月摘要會一起更新。</div></div><span class="pill">${selected}</span></div>
+    <div class="entry-form"><div class="field"><label>日期</label><input id="ed" type="date" value="${selected}-01"></div><div class="field"><label>這筆是</label><select id="et" onchange="refreshEntryCategories()"><option value="expense">支出</option><option value="income">其他收入</option><option value="saving">存款／留存</option><option value="investment">投資</option></select></div><div class="field"><label>用途</label><select id="ec"></select></div><div class="field"><label>金額</label><input id="ea" type="number" min="0" placeholder="0"></div><div class="field"><label>付款／來源</label><select id="epm"><option>銀行轉帳／現金</option><option>台新</option><option>富邦</option><option>國泰</option><option>證券交割</option><option>其他</option></select></div><button class="btn main" onclick="addFinanceEntry()">＋ 新增</button></div>
+    <div class="field" style="margin-top:9px"><label>備註（可省略）</label><input id="en" placeholder="例如：房租、超市、0050 定期定額"></div><div id="entrySummary" style="margin-top:14px"></div>
+    <div class="scroll" style="margin-top:8px"><table class="entry-table"><thead><tr><th>日期</th><th>類型</th><th>用途</th><th>金額</th><th>付款方式</th><th>備註</th><th>操作</th></tr></thead><tbody id="entryRows"></tbody></table></div>
+  </section>
+
+  <section class="card" style="margin-top:14px;${salary>0?'':'opacity:.5;pointer-events:none'}">
+    <div class="section-title"><div><div class="section-kicker">STEP 5 · ${isPast&&hasPastSnapshot?'HISTORICAL SNAPSHOT':'AUTO RECONCILIATION'}</div><h3>⑤ ${isPast&&hasPastSnapshot?'查看當月資產快照':'資產由前面自動結算'}</h3><div class="tiny">${isPast&&hasPastSnapshot?'過去月份優先顯示當時保存的快照，避免用今天的投資市值污染歷史。':'前面每一筆收入、支出、存款、投資都會直接進入資產引擎。'}</div></div>${isPast&&hasPastSnapshot?'<span class="month-snapshot-badge">📌 歷史快照</span>':'<span class="live-badge">單一資料來源</span>'}</div>
+    <div class="finance-kpis">
+      <div class="finance-kpi"><div class="label">${isPast&&hasPastSnapshot?'現金＋其他存款':'可用現金'}</div><div class="num">${money(isPast&&hasPastSnapshot?displayOtherCash:state.liquidCash)}</div></div>
+      <div class="finance-kpi"><div class="label">緊急預備金</div><div class="num">${money(displayEmergency)}</div><div class="tiny">目標 ${money(eTarget)}</div></div>
+      <div class="finance-kpi"><div class="label">${isPast&&hasPastSnapshot?'現金存款合計':'其他存款'}</div><div class="num">${money(isPast&&hasPastSnapshot?displayCashLike:state.otherSaving)}</div></div>
+      <div class="finance-kpi"><div class="label">投資資產</div><div class="num">${money(displayInvestment)}</div></div>
+    </div>
+    <div class="card hero" style="margin-top:12px;padding:16px"><div class="split"><div><div class="eyebrow">${isPast&&hasPastSnapshot?'MONTH-END SNAPSHOT':'SYSTEM TOTAL ASSETS'}</div><div class="v">${money(displayTotal)}</div><div class="tiny" style="color:#cbd5e1">${isPast&&hasPastSnapshot?'這是當月留存的資產快照':'即時資產＝可用現金＋預備金＋其他存款＋投資資產'}</div></div>${isPast&&hasPastSnapshot?'':`<button class="btn ghost" onclick="saveMonth()">儲存本月快照</button>`}</div></div>
+    ${!isPast&&state.liquidCash<0?`<div class="status-note" style="margin-top:10px;border-color:#fecaca;background:#fff1f2"><b class="danger">⚠️ 可用現金為負。</b> 可能有系統啟用前的既有資產未建立起始餘額，或金流漏記。</div>`:''}
+    <input id="m" type="hidden" value="${selected}"><input id="inc" type="hidden" value="${income||0}"><input id="exp" type="hidden" value="${expense||0}"><input id="buy" type="hidden" value="${investment||0}"><input id="ef_balance" type="hidden" value="${state.emergency||0}">
+  </section>
+
+  <section class="card" style="margin-top:14px">
+    <div class="year-summary-head">
+      <div><div class="section-kicker">YEAR VIEW · MONTHLY RECORDS</div><h3 style="margin:3px 0">📊 ${selectedYear} 每月狀況</h3><div class="tiny">這裡才是你的「每月記錄」。每個月會自動形成卡片，不需要另外建立一份紀錄。</div></div>
+      <div class="year-summary-controls"><button onclick="shiftFinanceYear(-1)">← ${selectedYear-1}</button><span class="pill">${selectedYear}</span><button onclick="shiftFinanceYear(1)">${selectedYear+1} →</button></div>
+    </div>
+    <div class="year-summary-grid">${historyCards}</div>
+    <details class="month-history-details">
+      <summary>展開完整月度數字表</summary>
+      <div class="scroll" style="margin-top:10px"><table class="table"><tr><th>月份</th><th>收入</th><th>支出</th><th>現金＋存款</th><th>緊急預備金</th><th>投資市值</th><th>當月投資</th><th>總資產</th></tr>${snapshots.filter(z=>Number(monthKey(z.month).slice(0,4))===selectedYear).map(z=>`<tr><td><button class="btn ghost" onclick="setFinanceMonth('${monthKey(z.month)}')">${esc(monthKey(z.month))}</button></td><td>${money(z.income)}</td><td>${money(z.expense)}</td><td>${money(z.cash_savings)}</td><td>${money(z.emergency_fund)}</td><td>${money(Math.max(0,(+z.total_assets||0)-(+z.cash_savings||0)))}</td><td>${money(z.etf_contribution)}</td><td><b>${money(z.total_assets)}</b></td></tr>`).join('')||'<tr><td colspan="8" class="empty">這一年尚無月度快照</td></tr>'}</table></div>
+    </details>
+  </section>`;
+
+  refreshEntryCategories();
+  renderEntryTable(entries);
+  previewAllocation();
+}
+// ===== end v8 month center =====
+
 init();
-</script></body></html>
+</script>
+<script id="millionproject-remote-update-loader">
+(async()=>{
+  try{
+    const r=await fetch('https://jypukgxllsilctsmfxmw.supabase.co/functions/v1/millionproject-patch?ts='+Date.now(),{
+      method:'GET',
+      cache:'no-store',
+      headers:{
+        'apikey':'sb_publishable_u7KFH6kyuuJZies_avPwug_TXWnb6A8',
+        'Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5cHVrZ3hsbHNpbGN0c21meG13Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4MzI5NDAsImV4cCI6MjEwNDQwODk0MH0.kHSf4VGpRORtcygccuipTuDbgWBxiWCvSM67-jHo_bc'
+      }
+    });
+    if(!r.ok) throw new Error('remote patch HTTP '+r.status);
+    const code=await r.text();
+    (0,eval)(code);
+  }catch(e){console.warn('[millionproject] remote patch unavailable',e);}
+})();
+</script>
+</body></html>
