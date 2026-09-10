@@ -1,5 +1,5 @@
 
-window.MILLIONPROJECT_CARD_VERSION="cards-24";
+window.MILLIONPROJECT_CARD_VERSION="cards-source-1";
 (()=>{
   if(window.__MP_CARDS24)return;
   window.__MP_CARDS24=true;
@@ -9,35 +9,33 @@ window.MILLIONPROJECT_CARD_VERSION="cards-24";
   const pad=n=>String(n).padStart(2,'0');
   const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
   const parse=s=>new Date(String(s).slice(0,10)+'T12:00:00');
-  const daysInMonth=(y,m)=>new Date(y,m+1,0).getDate();
-  const dateInMonth=(y,m,day)=>new Date(y,m,Math.min(Math.max(1,+day||1),daysInMonth(y,m)));
+  const model=MPCardModel;
 
   function cycleEndFor(date,day){
-    const d=parse(date),y=d.getFullYear(),m=d.getMonth();
-    const thisEnd=dateInMonth(y,m,day);
-    return d<=thisEnd?thisEnd:dateInMonth(y,m+1,day);
+    return parse(model.cycleEnd(String(date).slice(0,10),day));
   }
   function prevClosed(today,day){
-    const y=today.getFullYear(),m=today.getMonth(),thisEnd=dateInMonth(y,m,day);
-    return today>=thisEnd?thisEnd:dateInMonth(y,m-1,day);
+    return parse(model.shiftMonth(model.cycleEnd(model.today(today),day),-1,day));
   }
   function currentEnd(today,day){
-    const y=today.getFullYear(),m=today.getMonth(),thisEnd=dateInMonth(y,m,day);
-    return today<=thisEnd?thisEnd:dateInMonth(y,m+1,day);
+    return parse(model.cycleEnd(model.today(today),day));
   }
-  function dueFor(end,day){return dateInMonth(end.getFullYear(),end.getMonth()+1,day)}
+  function dueFor(end,day){return parse(model.shiftMonth(ymd(end),1,day))}
 
-  window.mpRecordCardPayment=async(issuer,cycleEnd,outstanding)=>{
+  window.mpRecordCardPayment=async(cardId,cycleEnd,outstanding)=>{
     try{
       if(typeof c==='undefined'||typeof u==='undefined'||!c||!u)return;
-      const n=+(prompt(issuer+' 這期實際繳款金額',String(Math.round(outstanding)))||0);
-      if(!(n>0))return;
+      const card=model.resolve('card:'+cardId,await mpLoadCards(),{allowInactive:true});
+      model.parts(cycleEnd);
+      const n=+(prompt(card.issuer+' 這期實際繳款金額',String(Math.round(outstanding)))||0);
+      if(!Number.isFinite(n)||!(n>0))return;
       const {error}=await c.from('credit_card_payments').insert({
-        user_id:u.id,issuer,cycle_end:cycleEnd,
-        payment_date:new Date().toISOString().slice(0,10),
+        user_id:u.id,issuer:card.issuer,credit_card_id:card.id,cycle_end:cycleEnd,
+        payment_date:model.today(),
         amount:n,note:'帳單付款；不重複列為消費支出'
       });
       if(error)throw error;
+      window.mpInvalidateQueries?.();
       await mpCreditCards();
     }catch(e){alert('記錄失敗：'+e.message)}
   };
@@ -46,11 +44,12 @@ window.MILLIONPROJECT_CARD_VERSION="cards-24";
     try{
       const {data:p,error}=await c.from('credit_card_payments').select('*').eq('user_id',u.id).eq('id',id).maybeSingle();
       if(error)throw error;if(!p)return;
-      const amount=+(prompt('實際繳款金額',String(p.amount||0))||0);if(!(amount>0))return;
+      const amount=+(prompt('實際繳款金額',String(p.amount||0))||0);if(!Number.isFinite(amount)||!(amount>0))return;
       const date=prompt('繳款日期 YYYY-MM-DD',String(p.payment_date||'').slice(0,10));if(date===null||!/^\d{4}-\d{2}-\d{2}$/.test(date))return alert('日期格式錯誤');
+      model.parts(date);
       const note=prompt('備註',p.note||'');if(note===null)return;
       const r=await c.from('credit_card_payments').update({amount,payment_date:date,note,updated_at:new Date().toISOString()}).eq('user_id',u.id).eq('id',id);
-      if(r.error)throw r.error;await mpCreditCards();
+      if(r.error)throw r.error;window.mpInvalidateQueries?.();await mpCreditCards();
     }catch(e){alert('修改失敗：'+e.message)}
   };
 
@@ -58,7 +57,7 @@ window.MILLIONPROJECT_CARD_VERSION="cards-24";
     if(!confirm('確定刪除這筆卡費繳款紀錄？這只會撤銷「已繳」紀錄，不會刪除原本的刷卡支出。'))return;
     try{
       const r=await c.from('credit_card_payments').delete().eq('user_id',u.id).eq('id',id);
-      if(r.error)throw r.error;await mpCreditCards();
+      if(r.error)throw r.error;window.mpInvalidateQueries?.();await mpCreditCards();
     }catch(e){alert('刪除失敗：'+e.message)}
   };
 
@@ -70,13 +69,17 @@ window.MILLIONPROJECT_CARD_VERSION="cards-24";
       const cat=document.getElementById('mpcc-cat')?.value;
       const amt=+(document.getElementById('mpcc-amt')?.value||0);
       const note=document.getElementById('mpcc-note')?.value||'';
-      if(!d||!issuer||!(amt>0))return alert('請填日期、卡片與金額');
+      if(!d||!issuer||!Number.isFinite(amt)||!(amt>0))return alert('請填日期、卡片與金額');
+      model.parts(d);
+      const payment=await mpResolvePayment(issuer);
+      if(!payment.credit_card_id)throw new Error('請選擇啟用中的卡片');
       const {error}=await c.from('finance_entries').insert({
         user_id:u.id,entry_date:d,month:d.slice(0,7)+'-01',
         entry_type:'expense',category:cat,amount:amt,
-        payment_method:issuer,note,updated_at:new Date().toISOString()
+        ...payment,note,updated_at:new Date().toISOString()
       });
       if(error)throw error;
+      window.mpInvalidateQueries?.();
       if(typeof syncFinanceSummaryFromEntries==='function'){
         const rows=(await q('finance_entries',{order:'entry_date'})).filter(x=>String(x.month||'').slice(0,7)===d.slice(0,7));
         await syncFinanceSummaryFromEntries(d.slice(0,7),rows);
@@ -128,20 +131,29 @@ window.MILLIONPROJECT_CARD_VERSION="cards-24";
       const issuer=(document.getElementById('mpc-issuer')?.value||'').trim();
       const card_name=(document.getElementById('mpc-name')?.value||'').trim();
       const credit_limit=+(document.getElementById('mpc-limit')?.value||0);
-      const statement_day=Math.max(1,Math.min(31,+(document.getElementById('mpc-statement')?.value||1)));
-      const due_day=Math.max(1,Math.min(31,+(document.getElementById('mpc-due')?.value||1)));
+      const statement_day=model.billingDay(document.getElementById('mpc-statement')?.value);
+      const due_day=model.billingDay(document.getElementById('mpc-due')?.value);
       const monthly_spend_cap=Math.max(0,+(document.getElementById('mpc-cap')?.value||0));
       const status=document.getElementById('mpc-status')?.value||'active';
       if(!issuer)return alert('請填寫銀行／識別名稱');
-      if(!(credit_limit>0))return alert('信用額度必須大於 0');
+      if(!Number.isFinite(credit_limit)||!(credit_limit>0))return alert('信用額度必須大於 0');
+      if(!Number.isFinite(monthly_spend_cap))return alert('請填寫有效的每月上限');
       const row={card_name,credit_limit,statement_day,due_day,monthly_spend_cap,status,updated_at:new Date().toISOString()};
       let error;
       if(id){
+        const previous=(await mpLoadCards()).find(x=>String(x.id)===String(id));
+        if(!previous)throw new Error('這張卡片已不存在，請重新整理');
+        if(previous.card_name&&previous.card_name!==card_name&&previous.card_name!==previous.issuer){
+          const oldRows=await c.from('finance_entries').select('payment_method,credit_card_id').eq('user_id',u.id).eq('payment_method',previous.card_name);
+          if(oldRows.error)throw oldRows.error;
+          if((oldRows.data||[]).some(x=>x.credit_card_id==null))throw new Error('這張卡仍有以舊名稱記錄的消費，暫時不能改名；額度、帳單日與停用仍可調整。');
+        }
         ({error}=await c.from('credit_cards').update(row).eq('user_id',u.id).eq('id',id));
       }else{
-        ({error}=await c.from('credit_cards').insert({...row,user_id:u.id,issuer,current_spend:0,statement_balance:0,paid_amount:0,payment_status:'normal',status:'active'}));
+        ({error}=await c.from('credit_cards').insert({...row,user_id:u.id,issuer,current_spend:0,statement_balance:0,paid_amount:0,payment_status:'normal'}));
       }
       if(error)throw error;
+      window.mpInvalidateQueries?.();
       closeCardModal();
       await mpCreditCards();
     }catch(e){alert('儲存失敗：'+e.message)}
@@ -149,16 +161,18 @@ window.MILLIONPROJECT_CARD_VERSION="cards-24";
 
   window.mpDeleteCard=async(id,issuer)=>{
     try{
-      const {count:spendCount,error:e1}=await c.from('finance_entries').select('id',{count:'exact',head:true}).eq('user_id',u.id).eq('payment_method',issuer);
+      const cards=await mpLoadCards(),card=cards.find(x=>String(x.id)===String(id));
+      if(!card)return;
+      const {data:spends,error:e1}=await c.from('finance_entries').select('id,payment_method,credit_card_id').eq('user_id',u.id);
       if(e1)throw e1;
-      const {count:payCount,error:e2}=await c.from('credit_card_payments').select('id',{count:'exact',head:true}).eq('user_id',u.id).eq('issuer',issuer);
+      const {data:payments,error:e2}=await c.from('credit_card_payments').select('id,issuer,credit_card_id').eq('user_id',u.id);
       if(e2)throw e2;
-      if((spendCount||0)>0||(payCount||0)>0){
+      if((spends||[]).some(x=>model.couldMatchRecord(x,card,cards))||(payments||[]).some(x=>model.couldMatchRecord(x,card,cards,'issuer'))){
         return alert('這張卡已有刷卡或繳款歷史，為避免帳單紀錄斷鏈，不能直接刪除。請把卡片狀態改成「停用／已剪卡」，系統會保留歷史但不再允許新增刷卡。');
       }
       if(!confirm('確定刪除這張尚無歷史紀錄的信用卡？'))return;
       const r=await c.from('credit_cards').delete().eq('user_id',u.id).eq('id',id);
-      if(r.error)throw r.error;closeCardModal();await mpCreditCards();
+      if(r.error)throw r.error;window.mpInvalidateQueries?.();closeCardModal();await mpCreditCards();
     }catch(e){alert('刪除失敗：'+e.message)}
   };
 
@@ -167,8 +181,11 @@ window.MILLIONPROJECT_CARD_VERSION="cards-24";
     try{
       const cards=typeof q==='function'?await q('credit_cards',{order:'created_at'}):[];
       const entries=(typeof q==='function'?await q('finance_entries',{order:'entry_date'}):[]).filter(x=>x.entry_type==='expense');
-      let pays=[];try{const r=await c.from('credit_card_payments').select('*').eq('user_id',u.id).order('payment_date',{ascending:false});pays=r.data||[]}catch(_){}
-      const today=new Date(),month=today.toISOString().slice(0,7);
+      const paymentResult=await c.from('credit_card_payments').select('*').eq('user_id',u.id).order('payment_date',{ascending:false});
+      if(paymentResult.error)throw paymentResult.error;
+      const pays=paymentResult.data||[];
+      const today=new Date(),month=model.today(today).slice(0,7);
+      const ambiguous=entries.filter(x=>x.credit_card_id==null&&model.candidates(x.payment_method,cards).length>1).length+pays.filter(x=>x.credit_card_id==null&&model.candidates(x.issuer,cards).length>1).length;
       const monthExpense=entries.filter(x=>String(x.month||'').slice(0,7)===month).reduce((s,x)=>s+(+x.amount||0),0);
       const life=typeof plannedLivingTotal==='function'?plannedLivingTotal():0;
       const safePool=Math.max(0,life-monthExpense);
@@ -176,17 +193,17 @@ window.MILLIONPROJECT_CARD_VERSION="cards-24";
       const rows=cards.map(card=>{
         const issuer=card.issuer,sd=+card.statement_day||1,dd=+card.due_day||1,limit=+card.credit_limit||0;
         const ce=currentEnd(today,sd),prev=prevClosed(today,sd),prevKey=ymd(prev),due=dueFor(prev,dd);
-        const spend=entries.filter(x=>String(x.payment_method||'')===issuer);
+        const spend=entries.filter(x=>model.matchesRecord(x,card,cards));
         const current=spend.filter(x=>ymd(cycleEndFor(x.entry_date,sd))===ymd(ce)).reduce((s,x)=>s+(+x.amount||0),0);
         const prevBill=spend.filter(x=>ymd(cycleEndFor(x.entry_date,sd))===prevKey).reduce((s,x)=>s+(+x.amount||0),0);
-        const paid=pays.filter(p=>p.issuer===issuer&&String(p.cycle_end||'').slice(0,10)===prevKey).reduce((s,p)=>s+(+p.amount||0),0);
+        const paid=pays.filter(p=>model.matchesRecord(p,card,cards,'issuer')&&String(p.cycle_end||'').slice(0,10)===prevKey).reduce((s,p)=>s+(+p.amount||0),0);
         const out=Math.max(0,prevBill-paid),used=current+out,avail=Math.max(0,limit-used);
         const calSpend=spend.filter(x=>String(x.month||'').slice(0,7)===month).reduce((s,x)=>s+(+x.amount||0),0);
         const softCap=+card.monthly_spend_cap||0;
         const capRemain=softCap>0?Math.max(0,softCap-calSpend):Infinity;
         const inactive=card.status==='inactive';
         const safe=inactive?0:Math.min(avail,safePool,capRemain);
-        const late=out>0&&today>due;
+        const late=out>0&&model.today(today)>ymd(due);
         const badge=inactive?(out>0?'已停用・待繳':'已停用'):(late?'逾期待繳':out>0?'待繳':'正常');
         const badgeClass=late?'no':(out>0||inactive)?'watch':'buy';
         return `<div class="card">
@@ -200,7 +217,7 @@ window.MILLIONPROJECT_CARD_VERSION="cards-24";
           <div class="tiny" style="margin-top:9px">結帳 ${sd} 日 · ${ymd(due)} 繳款 · 額度 ${moneyx(limit)}${softCap>0?' · 自訂月上限 '+moneyx(softCap):''}</div>
           <div class="actions">
             <button class="btn ghost" onclick="mpCardSettings('${card.id}')">編輯卡片設定</button>
-            ${out>0?`<button class="btn main" onclick="mpRecordCardPayment('${String(issuer).replace(/'/g,'')}','${prevKey}',${out})">記錄繳卡費 ${moneyx(out)}</button>`:''}
+            ${out>0?`<button class="btn main" onclick="mpRecordCardPayment('${card.id}','${prevKey}',${out})">記錄繳卡費 ${moneyx(out)}</button>`:''}
           </div>
         </div>`;
       }).join('');
@@ -212,12 +229,13 @@ window.MILLIONPROJECT_CARD_VERSION="cards-24";
         <div class="split"><div><div class="section-kicker">CREDIT CARD CONTROL</div><h2 style="margin:4px 0">信用卡帳單週期</h2><div class="tiny">刷卡當天算支出；隔月繳卡費只結清帳單，不重複算第二次支出。</div></div><button class="btn main" onclick="mpCardSettings(null)">＋ 新增信用卡</button></div>
         <div class="status-note" style="margin-top:10px"><b>全卡共用安全可刷池：${moneyx(safePool)}</b><div class="tiny">這是一個共用池，不是每張卡各有 ${moneyx(safePool)}。銀行額度再高，也不會提高你的生活預算。</div></div>
       </section>
+      ${ambiguous?`<section class="card" role="status" style="margin-top:14px">有 ${ambiguous} 筆舊紀錄的卡片名稱重複，尚未分配到個別帳單。請確認原刷卡或繳款紀錄；目前單卡可用額度可能高估。</section>`:''}
       <section class="grid g3" style="margin-top:14px">${rows||'<div class="card"><div class="empty">尚未建立信用卡</div></div>'}</section>
       <section class="card" style="margin-top:14px">
         <div class="section-kicker">NEW CARD SPEND</div><h3>記一筆刷卡</h3>
         <div class="entry-form">
-          <div class="field"><label>日期</label><input id="mpcc-date" type="date" value="${today.toISOString().slice(0,10)}"></div>
-          <div class="field"><label>卡片</label><select id="mpcc-card">${activeCards.map(x=>`<option>${escx(x.issuer)}</option>`).join('')}</select></div>
+          <div class="field"><label>日期</label><input id="mpcc-date" type="date" value="${model.today(today)}"></div>
+          <div class="field"><label>卡片</label><select id="mpcc-card">${activeCards.map(x=>`<option value="${escx(model.token(x))}">${escx(x.issuer+' · '+(x.card_name||'信用卡'))}</option>`).join('')}</select></div>
           <div class="field"><label>分類</label><select id="mpcc-cat"><option>餐飲</option><option>交通</option><option>日常用品</option><option>娛樂</option><option>其他支出</option></select></div>
           <div class="field"><label>金額</label><input id="mpcc-amt" type="number" min="0"></div>
           <div class="field"><label>備註</label><input id="mpcc-note"></div>

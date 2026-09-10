@@ -66,15 +66,8 @@ window.MILLIONPROJECT_QUALITY_VERSION="quality-24";
       const ids=['epm','mpq-pay'];
       const selects=ids.map(id=>document.getElementById(id)).filter(Boolean);
       if(!selects.length)return;
-      const {data,error}=await c.from('credit_cards').select('issuer,status').eq('user_id',u.id).order('created_at');
-      if(error)throw error;
-      const issuers=(data||[]).filter(x=>x.status!=='inactive').map(x=>String(x.issuer||'').trim()).filter(Boolean);
-      selects.forEach(sel=>{
-        const cur=sel.value;
-        const base=['銀行轉帳／現金',...issuers,'證券交割','其他'];
-        sel.innerHTML=[...new Set(base)].map(x=>`<option>${escx(x)}</option>`).join('');
-        if(base.includes(cur))sel.value=cur;
-      });
+      const cards=await mpLoadCards();
+      selects.forEach(sel=>mpFillCardOptions(sel,cards));
     }catch(e){console.warn('payment options',e)}
   }
 

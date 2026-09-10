@@ -754,22 +754,47 @@ async function monthly(){
 }
 async function addFinanceEntry(){
   if(!u)return alert('請先登入');
-  const date=$('ed')?.value||new Date().toISOString().slice(0,10),type=$('et')?.value,cat=$('ec')?.value,amt=+$('ea')?.value||0;
-  if(amt<=0)return alert('請輸入大於 0 的金額');
-  const note=$('en')?.value.trim()||'',month=date.slice(0,7)+'-01';
-  const {error}=await c.from('finance_entries').insert({user_id:u.id,entry_date:date,month,entry_type:type,category:cat,amount:amt,payment_method:$('epm')?.value||'銀行轉帳／現金',note,updated_at:new Date().toISOString()});
-  if(error)return alert('新增明細失敗：'+error.message);
-  await persistMonthSnapshot(date.slice(0,7),await moneyEngine(date.slice(0,7)));
-  await monthly();v7Toast('已新增，所有進度已同步更新');
+  try{
+    const date=$('ed')?.value||MPCardModel.today(),type=$('et')?.value,cat=$('ec')?.value,amt=Number($('ea')?.value);
+    MPCardModel.parts(date);
+    if(!Number.isFinite(amt)||amt<=0)return alert('請輸入大於 0 的金額');
+    const note=$('en')?.value.trim()||'',month=date.slice(0,7)+'-01';
+    const choice=$('epm')?.value||'銀行轉帳／現金';
+    const payment=type==='expense'||choice.startsWith('card:')?await mpResolvePayment(choice):{payment_method:choice,credit_card_id:null};
+    const {error}=await c.from('finance_entries').insert({user_id:u.id,entry_date:date,month,entry_type:type,category:cat,amount:amt,...payment,note,updated_at:new Date().toISOString()});
+    if(error)throw error;
+    window.mpInvalidateQueries?.();
+    await persistMonthSnapshot(date.slice(0,7),await moneyEngine(date.slice(0,7)));
+    await monthly();v7Toast('已新增，所有進度已同步更新');
+  }catch(e){alert('新增明細失敗：'+e.message)}
 }
 async function editFinanceEntry(id){
-  let entries=await currentMonthEntries(),x=entries.find(z=>String(z.id)===String(id));if(!x)return;
-  let date=prompt('日期 YYYY-MM-DD',String(x.entry_date||''));if(date===null)return;let amt=prompt('金額',String(x.amount||0));if(amt===null)return;let note=prompt('備註',x.note||'');if(note===null)return;let cat=prompt('分類',x.category||'');if(cat===null)return;let pm=prompt('付款／來源',x.payment_method||'銀行轉帳／現金');if(pm===null)return;
-  let ok=await upd('finance_entries',id,{entry_date:date,month:date.slice(0,7)+'-01',amount:+amt||0,note,category:cat,payment_method:pm,updated_at:new Date().toISOString()});
-  if(ok){await persistMonthSnapshot(date.slice(0,7),await moneyEngine(date.slice(0,7)));await monthly();v7Toast('已修改，所有進度已重算')}
+  try{
+    const entries=await currentMonthEntries(),x=entries.find(z=>String(z.id)===String(id));if(!x)return;
+    const date=prompt('日期 YYYY-MM-DD',String(x.entry_date||''));if(date===null)return;
+    MPCardModel.parts(date);
+    const amt=prompt('金額',String(x.amount||0));if(amt===null)return;
+    const amount=Number(amt);if(!Number.isFinite(amount)||amount<=0)return alert('請輸入大於 0 的金額');
+    const note=prompt('備註',x.note||'');if(note===null)return;
+    const cat=prompt('分類',x.category||'');if(cat===null)return;
+    const pm=prompt('付款／來源（可填銀行名稱或完整卡片名稱）',x.payment_method||'銀行轉帳／現金');if(pm===null)return;
+    const payment=x.entry_type==='expense'||pm.startsWith('card:')?await mpResolvePayment(pm,x):{payment_method:pm,credit_card_id:null};
+    const {error}=await c.from('finance_entries').update({entry_date:date,month:date.slice(0,7)+'-01',amount,note,category:cat,...payment,updated_at:new Date().toISOString()}).eq('user_id',u.id).eq('id',id);
+    if(error)throw error;
+    window.mpInvalidateQueries?.();
+    for(const month of new Set([String(x.month).slice(0,7),date.slice(0,7)]))await persistMonthSnapshot(month,await moneyEngine(month));
+    await monthly();v7Toast('已修改，所有進度已重算');
+  }catch(e){alert('修改明細失敗：'+e.message)}
 }
 async function deleteFinanceEntry(id){
-  if(!confirm('確定刪除這筆明細？'))return;let entries=await currentMonthEntries(),month=entries[0]?monthKey(entries[0].month):selectedMonth();let z=await c.from('finance_entries').delete().eq('id',id);if(z.error)return alert(z.error.message);await persistMonthSnapshot(month,await moneyEngine(month));await monthly();v7Toast('已刪除，所有進度已重算');
+  if(!confirm('確定刪除這筆明細？'))return;
+  try{
+    const entries=await currentMonthEntries(),entry=entries.find(x=>String(x.id)===String(id));if(!entry)return;
+    const month=monthKey(entry.month);
+    const {error}=await c.from('finance_entries').delete().eq('user_id',u.id).eq('id',id);if(error)throw error;
+    window.mpInvalidateQueries?.();
+    await persistMonthSnapshot(month,await moneyEngine(month));await monthly();v7Toast('已刪除，所有進度已重算');
+  }catch(e){alert('刪除明細失敗：'+e.message)}
 }
 let investmentReturnTab='p';
 function openInvestmentBuy(){investmentReturnTab=tab;const month=selectedMonth();$('app').insertAdjacentHTML('beforeend',`<div class="modal-backdrop" id="invModal" onclick="if(event.target.id==='invModal')closeInvModal()"><div class="modal"><div class="modal-head"><h3>📈 記錄本月投資</h3><button class="btn ghost" onclick="closeInvModal()">關閉</button></div><div class="row3"><div class="field"><label>日期</label><input id="iv_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div><div class="field"><label>標的代號</label><input id="iv_symbol" placeholder="0050"></div><div class="field"><label>名稱</label><input id="iv_name" placeholder="元大台灣50"></div></div><div class="row3" style="margin-top:10px"><div class="field"><label>實際投入金額</label><input id="iv_amount" type="number" min="0"></div><div class="field"><label>買入數量（可選）</label><input id="iv_qty" type="number" step="any" min="0"></div><div class="field"><label>成交價（可選）</label><input id="iv_price" type="number" step="any" min="0"></div></div><div class="row" style="margin-top:10px"><div class="field"><label>策略</label><select id="iv_strategy"><option>核心ETF</option><option>其他ETF</option><option>個股</option><option>債券／債券ETF</option><option>其他投資</option></select></div><div class="field"><label>備註</label><input id="iv_note"></div></div><div class="status-note" style="margin-top:10px"><b>智慧連動：</b>儲存後同時寫入本月財務；有數量與成交價時也更新持倉。</div><div class="actions"><button class="btn main" onclick="saveInvestmentBuy()">儲存並同步</button><button class="btn ghost" onclick="closeInvModal()">取消</button></div></div></div>`)}
