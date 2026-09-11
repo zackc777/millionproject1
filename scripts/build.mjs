@@ -8,7 +8,7 @@ import path from 'node:path';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sha = data => createHash('sha256').update(data).digest('hex');
 const order = JSON.parse(await readFile(path.join(root, 'src/runtime/order.json')));
-const files = ['src/card-model.js', 'src/card-service.js', ...order.map(n => `src/runtime/${n}.js`)];
+const files = ['src/card-model.js', 'src/card-service.js', 'src/finance-model.js', 'src/finance-view.js', ...order.map(n => `src/runtime/${n}.js`)];
 const commit = process.env.VERCEL_GIT_COMMIT_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
 let html = await readFile(path.join(root, 'index.html'), 'utf8');
 const loader = /<script id="millionproject-remote-update-loader">[\s\S]*?<\/script>/g;

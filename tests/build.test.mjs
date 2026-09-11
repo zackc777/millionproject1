@@ -13,10 +13,10 @@ test('建置只載入固定同源模組；manifest、SRI、HTML 指紋一致',()
   const html=read('dist/index.html'),release=JSON.parse(read('dist/release.json'));
   const baseline=JSON.parse(read('docs/baseline/release.json'));
   assert.equal(release.repository,'zackc777/millionproject1');
-  assert.equal(release.mode,'github-source');assert.equal(release.modules.length,11);
+  assert.equal(release.mode,'github-source');assert.equal(release.modules.length,13);
   assert.equal(release.htmlSha256,sha(html));
   assert.doesNotMatch(html,/millionproject-remote-update-loader|functions\/v1\/millionproject-patch|\(0,eval\)/);
-  assert.deepEqual(release.modules.slice(2).map(x=>x.source),baseline.modules.map(x=>x.path));
+  assert.deepEqual(release.modules.slice(4).map(x=>x.source),baseline.modules.map(x=>x.path));
   let previous=-1;
   for(const module of release.modules){
     assert.match(module.url,/^\/assets\/[a-z-]+\.[a-f0-9]{16}\.js$/);
@@ -32,7 +32,7 @@ test('建置只載入固定同源模組；manifest、SRI、HTML 指紋一致',()
 });
 test('sidebar、手機導覽、icons、投資核心與投資 guard 保持原始正式 response',()=>{
   const baseline=JSON.parse(read('docs/baseline/release.json'));
-  for(const name of ['features','shell','icons','investment-core','investment-guard']){
+  for(const name of ['shell','icons','investment-core','investment-guard']){
     const module=baseline.modules.find(x=>x.name===name);
     assert.equal(sha(read(module.path)),module.sha256,name);
   }

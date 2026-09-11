@@ -8,76 +8,6 @@ window.MILLIONPROJECT_FEATURE_VERSION="features-23";
   const monthNow=()=>new Date().toISOString().slice(0,7);
   const escx=s=>String(s??'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 
-  async function salaryAdvice(){
-    const host=document.querySelector('.salary-start');
-    if(!host) return;
-    document.getElementById('mp-payday-advice')?.remove();
-    try{
-      const month=(document.getElementById('salary_month')?.value||monthNow()).slice(0,7);
-      const all=typeof q==='function'?await q('finance_entries',{order:'entry_date'}):[];
-      const cur=all.filter(x=>String(x.month||'').slice(0,7)===month);
-      const sum=t=>cur.filter(x=>x.entry_type===t).reduce((s,x)=>s+(+x.amount||0),0);
-      const income=sum('income');
-      if(!(income>0)) return;
-      const expense=sum('expense');
-      const alreadyEmergency=cur.filter(x=>x.entry_type==='saving'&&String(x.category||'').includes('緊急')).reduce((s,x)=>s+(+x.amount||0),0);
-      const st=typeof moneyEngine==='function'?await moneyEngine(month):{emergency:0};
-      const plan=typeof allocation==='function'
-        ? allocation(income,expense,+st.emergency||0,typeof plannedLivingTotal==='function'?plannedLivingTotal():0)
-        : {emergency:Math.round(income*.2),flex:0,core:0};
-      const suggest=Math.max(0,(+plan.emergency||0)-alreadyEmergency);
-      const flex=Math.max(0,+plan.flex||0);
-      const core=Math.max(0,+plan.core||0);
-
-      const e=document.createElement('section');
-      e.id='mp-payday-advice';
-      e.className='card';
-      e.style.marginTop='12px';
-      e.innerHTML=`
-        <div class="section-kicker">AFTER PAYDAY</div>
-        <h3 style="margin:4px 0 8px">薪資入帳後，先決定「留多少」再決定「投多少」</h3>
-        <div class="grid g3">
-          <div class="metric"><div class="k">建議本月補預備金</div><div class="v">${moneyx(suggest)}</div></div>
-          <div class="metric"><div class="k">建議保留現金彈性</div><div class="v">${moneyx(flex)}</div></div>
-          <div class="metric"><div class="k">核心投資參考</div><div class="v">${moneyx(core)}</div></div>
-        </div>
-        <div class="status-note" style="margin-top:10px">
-          <b>現金彈性不是一筆支出，也不一定要另外轉帳。</b>
-          <div class="tiny">如果只是留在活存作為下月銜接／機會金，不需要再記一筆，避免重複計帳。</div>
-        </div>
-        <div class="actions" style="margin-top:10px">
-          ${suggest>0?`<button class="btn main" id="mp-emergency-oneclick" onclick="mpApplyEmergency(${suggest},'${month}')">一鍵加入預備金 ${moneyx(suggest)}</button>`:'<span class="pill buy">本月預備金已達建議</span>'}
-        </div>`;
-      host.insertAdjacentElement('afterend',e);
-    }catch(err){ console.warn('payday advice',err); }
-  }
-
-  window.mpApplyEmergency=async(amount,month)=>{
-    if(window.__mpApplyingEmergency) return;
-    try{
-      if(typeof c==='undefined'||typeof u==='undefined'||!c||!u) return alert('請先登入');
-      window.__mpApplyingEmergency=true;
-      const btn=document.getElementById('mp-emergency-oneclick');
-      if(btn){btn.disabled=true;btn.textContent='儲存中…';}
-      const today=new Date().toISOString().slice(0,10);
-      const date=today.slice(0,7)===month?today:month+'-01';
-      const {error}=await c.from('finance_entries').insert({
-        user_id:u.id,entry_date:date,month:month+'-01',entry_type:'saving',
-        category:'緊急預備金',amount,
-        payment_method:'銀行轉帳／現金',
-        note:'[SMART_PAYDAY] 薪資後一鍵配置',
-        updated_at:new Date().toISOString()
-      });
-      if(error) throw error;
-      if(typeof syncFinanceSummaryFromEntries==='function'){
-        const rows=(await q('finance_entries',{order:'entry_date'})).filter(x=>String(x.month||'').slice(0,7)===month);
-        await syncFinanceSummaryFromEntries(month,rows);
-      }
-      if(typeof monthly==='function') await monthly();
-    }catch(e){ alert('加入失敗：'+e.message); }
-    finally{window.__mpApplyingEmergency=false;}
-  };
-
   function closePlanModal(){document.getElementById('mp-plan-modal')?.remove();}
   window.mpClosePlanModal=closePlanModal;
 
@@ -235,7 +165,6 @@ window.MILLIONPROJECT_FEATURE_VERSION="features-23";
 
   async function after(){
     let t='o';try{t=tab||'o'}catch(_){}
-    if(t==='m') await salaryAdvice();
     if(t==='p') await plans();
   }
   const old=window.render;
@@ -514,12 +443,12 @@ window.MILLIONPROJECT_BUDGET_UX_VERSION="budget-25";
 
   async function persistProfile(next,rerender=false){
     try{
-      window.__mpBudgetProfile=next;
-      localStorage.setItem('millionproject_budget_profile',JSON.stringify(next));
       if(typeof c!=='undefined'&&typeof u!=='undefined'&&c&&u){
         const {error}=await c.from('profiles').upsert({user_id:u.id,budget_profile:next,updated_at:new Date().toISOString()},{onConflict:'user_id'});
         if(error)throw error;
       }
+      window.__mpBudgetProfile=next;
+      localStorage.setItem('millionproject_budget_profile',JSON.stringify(next));
       try{if(typeof previewAllocation==='function')previewAllocation()}catch(_){}
       if(rerender&&typeof render==='function')await render();
       return true;
@@ -529,7 +458,7 @@ window.MILLIONPROJECT_BUDGET_UX_VERSION="budget-25";
   window.mpLifeSave=async()=>{
     const p=readProfile();
     for(const k of KEYS)p[k]=Math.max(0,+(document.getElementById('bp_'+k)?.value??p[k])||0);
-    await persistProfile(p,false);
+    if(!await persistProfile(p,false))return;
     await enhanceLifeBudget();
     if(typeof mpToast==='function')mpToast('生活預算已同步');
   };
@@ -539,7 +468,7 @@ window.MILLIONPROJECT_BUDGET_UX_VERSION="budget-25";
     p.__fixed={...DEFAULT_FIXED,...(p.__fixed||{})};
     p.__fixed[key]=!p.__fixed[key];
     for(const k of KEYS)p[k]=Math.max(0,+(document.getElementById('bp_'+k)?.value??p[k])||0);
-    await persistProfile(p,false);
+    if(!await persistProfile(p,false))return;
     await enhanceLifeBudget();
   };
 

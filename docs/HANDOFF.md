@@ -1,7 +1,6 @@
 # 維護交接
 
-> 2026-09-10 最新進度：使用者完成 GitHub App 安裝後，寫入已恢復。純來源交接已提交 PR #1（https://github.com/zackc777/millionproject1/pull/1）；候選版準備提交獨立 draft PR。下文的 GitHub 403 是先前阻礙紀錄。Vercel 與候選版瀏覽器驗收仍待完成，尚未發布正式站。
-
+> 2026-09-11：GitHub 寫入已恢復。PR #1 為來源封存，draft PR #2 包含固定 build、信用卡修正與本輪現金流／滾動配置。36 項離線測試通過；尚未合併或上線。詳細進度見 `docs/CASHFLOW-2026-09-11.md`。
 
 目標只有 `zackc777/millionproject1`。正式分支 `main`，正式站 https://millionproject1.vercel.app/。
 
@@ -26,7 +25,7 @@
 
 ## 發佈前缺口
 
-2026-09-10 續作：GitHub 讀取可用；建立 Git tree 回覆 `403 Resource not accessible by integration`，shell push 也沒有可用的認證。兩個分支目前只在本地，尚未建立遠端 PR。應修復正確 repository 的連線寫入權限，不得改用另一個 repository 或繞過存取限制。
+GitHub PR #1 與 #2 已建立，後續應更新這兩個 PR。Vercel 與實際候選瀏覽器驗收仍未完成。
 
 Vercel scope `z9000282-8151`（team_NiXOiZoKbGaVArOOHRjglUmH）目前連線回覆 403，需取得此 scope 存取後核對 production alias、build 設定和 logs。GitHub status 所指的既有部署為 `5jb9LYxSeiCwnLmSHragFDjR9Gap`；不能把它未經核對地當作目前 alias deployment。
 
@@ -37,9 +36,9 @@ Vercel scope `z9000282-8151`（team_NiXOiZoKbGaVArOOHRjglUmH）目前連線回�
 1. 信用卡穩定 ID、結帳日當天歸屬、舊字串唯一匹配。
 2. 跨月交易與歷史快照估值、投資並行寫入、RPC 關聯 ownership。
 3. 行情寫入授權、同日正式價優先與防止舊價格回蓋、研究頁舊 Yahoo 路徑。
-4. 多期未清帳款與完整歷史繳款入口。
+4. 多期未清帳款與完整歷史繳款入口已在候選版完成，待實際驗收。
 5. 移除多層 render 包裝、重複 quality code 與日期 Proxy。
 
 每批修改需記錄做了什麼、如何測試、是否上線。使用者回報的問題加入此清單；不能把部署權限不足說成網站已修好。
 
-目前第一批候選修改及 18 項離線測試結果見 `docs/CANDIDATE-RELEASE.md`。純來源交接分支與原 main 的 `index.html`、`vercel.json` 相同；候選分支才切換 build 與信用卡邏輯。
+目前候選修改及 36 項離線測試結果見 `docs/CANDIDATE-RELEASE.md`。純來源交接分支與原 main 的 `index.html`、`vercel.json` 相同；候選分支才切換 build 與信用卡邏輯。

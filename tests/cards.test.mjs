@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { harness, card, plain } from './harness.mjs';
+import { harness, card, plain, fillPayment } from './harness.mjs';
 
 test('結帳日包含當天；台新、富邦、國泰依次月繳款',()=>{
   const m=harness().ctx.MPCardModel;
@@ -53,11 +53,11 @@ test('信用卡新增→帳單→繳款→修改／刪除繳款，支出不增�
   assert.equal(h.alerts.length,0);assert.equal(h.db.finance_entries.length,1);
   assert.equal(h.db.finance_entries[0].credit_card_id,'1');
   assert.match(h.app.innerHTML,/mpRecordCardPayment\('1','2026-09-17',300\)/);
-  h.prompts.push('300');await h.ctx.mpRecordCardPayment('1','2026-09-17',300);
+  await h.ctx.mpRecordCardPayment('1','2026-09-17',300);fillPayment(h);await h.ctx.mpSaveCardPayment();
   assert.equal(h.db.credit_card_payments[0].credit_card_id,'1');
   assert.equal(h.db.finance_entries.length,1);
-  assert.doesNotMatch(h.app.innerHTML,/mpRecordCardPayment\('1'/);
-  h.prompts.push('200','2026-09-18','部分繳款');await h.ctx.mpEditCardPayment('1');
+  assert.doesNotMatch(h.app.innerHTML,/mpRecordCardPayment\('1','2026-09-17'/);
+  await h.ctx.mpEditCardPayment('1');fillPayment(h,{amount:200,note:'部分繳款'});await h.ctx.mpSaveCardPayment();
   assert.match(h.app.innerHTML,/mpRecordCardPayment\('1','2026-09-17',100\)/);
   await h.ctx.mpDeleteCardPayment('1');
   assert.match(h.app.innerHTML,/mpRecordCardPayment\('1','2026-09-17',300\)/);
