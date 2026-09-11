@@ -20,14 +20,15 @@ window.MILLIONPROJECT_QUALITY_VERSION="quality-24";
   window.mpSaveBudgetProfile=async()=>{
     const keys=['rent','family','telecom','gym','daily','leisure'],o={};
     keys.forEach(k=>o[k]=Math.max(0,+(document.getElementById('bp_'+k)?.value)||0));
-    window.__mpBudgetProfile={...BUDGET_DEFAULT,...o};
-    localStorage.setItem('millionproject_budget_profile',JSON.stringify(window.__mpBudgetProfile));
+    const next={...window.mpGetBudgetProfile(),...o};
     try{
       if(typeof c!=='undefined'&&typeof u!=='undefined'&&c&&u){
-        const {error}=await c.from('profiles').upsert({user_id:u.id,budget_profile:window.__mpBudgetProfile,updated_at:new Date().toISOString()},{onConflict:'user_id'});
-        if(error)console.warn('cloud budget save',error);
+        const {error}=await c.from('profiles').upsert({user_id:u.id,budget_profile:next,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+        if(error)throw error;
       }
-    }catch(e){console.warn('cloud budget save',e)}
+    }catch(e){alert('生活預算儲存失敗：'+e.message);return;}
+    window.__mpBudgetProfile=next;
+    localStorage.setItem('millionproject_budget_profile',JSON.stringify(next));
     try{if(typeof previewAllocation==='function')previewAllocation()}catch(_){}
   };
   try{saveBudgetProfile=window.mpSaveBudgetProfile}catch(_){window.saveBudgetProfile=window.mpSaveBudgetProfile}
@@ -66,15 +67,8 @@ window.MILLIONPROJECT_QUALITY_VERSION="quality-24";
       const ids=['epm','mpq-pay'];
       const selects=ids.map(id=>document.getElementById(id)).filter(Boolean);
       if(!selects.length)return;
-      const {data,error}=await c.from('credit_cards').select('issuer,status').eq('user_id',u.id).order('created_at');
-      if(error)throw error;
-      const issuers=(data||[]).filter(x=>x.status!=='inactive').map(x=>String(x.issuer||'').trim()).filter(Boolean);
-      selects.forEach(sel=>{
-        const cur=sel.value;
-        const base=['銀行轉帳／現金',...issuers,'證券交割','其他'];
-        sel.innerHTML=[...new Set(base)].map(x=>`<option>${escx(x)}</option>`).join('');
-        if(base.includes(cur))sel.value=cur;
-      });
+      const cards=await mpLoadCards();
+      selects.forEach(sel=>mpFillCardOptions(sel,cards));
     }catch(e){console.warn('payment options',e)}
   }
 
