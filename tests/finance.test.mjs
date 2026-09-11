@@ -98,15 +98,36 @@ test('超過一千筆的帳務完整分頁讀取',async()=>{
 test('完整月度與總覽函式共用金流；無薪資月份仍可查看扣款與操作',async()=>{
   const h=harness('2026-09-10T04:00:00Z');
   const storage=new Map();h.ctx.localStorage={getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)};
+  let lifeRenders=0;h.ctx.mpEnhanceLifeBudget=async()=>lifeRenders++;
   h.ctx.fixtureClient=h.ctx.c;
   const html=read('index.html'),base=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(x=>x[1]).find(x=>x.includes("const U="));
   runInContext(base.replace('\ninit();\n','\n'),h.ctx);
   h.db.credit_cards=[card()];h.db.finance_entries=[entry('2026-08-01',20000,'income')];h.db.credit_card_payments=[payment('2026-09-02',4000)];
   await runInContext('c=fixtureClient;u={id:"test-user"};financeMonthCursor="2026-09";tab="m";monthly()',h.ctx);
   assert.match(h.app.innerHTML,/mp-spending-review/);assert.match(h.app.innerHTML,/本月現金支出／扣款/);assert.match(h.app.innerHTML,/4,000/);
+  assert.match(h.app.innerHTML,/id="mp-life-budget-card"/);assert.equal(lifeRenders,1,'direct monthly refresh must restore the same life-budget renderer');
   assert.doesNotMatch(h.app.innerHTML,/opacity:.5;pointer-events:none/);
   assert.equal(h.ctx.__mpMonthView.state.monthCardPayments,4000);
   await runInContext('tab="o";overview()',h.ctx);assert.match(h.app.innerHTML,/2026-09 MONEY FLOW/);assert.match(h.app.innerHTML,/4,000/);
+});
+test('生活預算只更新固定目標，快速切換不覆蓋右側配置或遺失狀態',async()=>{
+  const h=harness(),store=new Map();
+  h.ctx.localStorage={getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)};
+  h.ctx.__MP_QUALITY24=true;h.ctx.tab='m';
+  h.ctx.__mpBudgetProfile={rent:1000,family:2000,telecom:500,gym:500,daily:3000,leisure:0,__fixed:{rent:true,family:true,telecom:true,gym:true,daily:false,leisure:false}};
+  h.ctx.getBudgetProfile=()=>h.ctx.__mpBudgetProfile;
+  h.ctx.selectedMonth=()=> '2026-09';
+  h.ctx.__mpMonthView={userId:'test-user',state:{month:'2026-09',current:[]}};
+  let fallbackReads=0;h.ctx.q=async()=>{fallbackReads++;return []};
+  const life=h.field('mp-life-budget-card'),alloc=h.field('allocBox');alloc.innerHTML='ROLLING ALLOCATION';
+  h.load('src/runtime/features.js');
+  await h.ctx.mpEnhanceLifeBudget();
+  assert.equal(life.dataset.mpLifeRenderer,'single-source-v26');
+  assert.match(life.innerHTML,/設定生活預算/);assert.equal(fallbackReads,0,'reuse the monthly state instead of querying all entries again');
+  await Promise.all([h.ctx.mpLifeToggle('rent'),h.ctx.mpLifeToggle('family')]);
+  assert.equal(h.ctx.__mpBudgetProfile.__fixed.rent,false);assert.equal(h.ctx.__mpBudgetProfile.__fixed.family,false);
+  assert.match(life.innerHTML,/固定 2 項/);assert.equal(alloc.innerHTML,'ROLLING ALLOCATION');assert.doesNotMatch(alloc.innerHTML,/STEP 2/);
+  assert.doesNotMatch(read('src/runtime/features.js'),/finance-layout \.budget-grid/);
 });
 test('舊帳單彙總不推估成另一份每月生活費，繳卡費後可配置不重複縮減',()=>{
   const entries=[entry('2026-09-01',20000,'income'),spend('2026-08-15',3000,{category:'帳單／費用'})];
