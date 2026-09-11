@@ -1,0 +1,66 @@
+{
+  "repository": "zackc777/millionproject1",
+  "branch": "main",
+  "sourceCommit": "6a9dc771697e6d6cb9688b350a450b78e0737dd1",
+  "productionUrl": "https://millionproject1.vercel.app/",
+  "supabaseProjectRef": "jypukgxllsilctsmfxmw",
+  "htmlSha256": "7bac6d7ba5c782981902eae6cb2d63a8ec29076ae84c4cfcb41bc59a6881ed7a",
+  "moduleOrder": [
+    "quality",
+    "features",
+    "cards",
+    "shell",
+    "runtime",
+    "icons",
+    "card-guard",
+    "investment-core",
+    "investment-guard"
+  ],
+  "modules": [
+    {
+      "name": "quality",
+      "path": "src/runtime/quality.js",
+      "sha256": "a40a5c6522298b64954dc398fa995b7eaa61527e9fb188d7e7e588bd8f3d9b94"
+    },
+    {
+      "name": "features",
+      "path": "src/runtime/features.js",
+      "sha256": "f51525ccfec0a73a0dbeee8dcc218a4b93fe7667bfbc797d55c62210ab4b6995"
+    },
+    {
+      "name": "cards",
+      "path": "src/runtime/cards.js",
+      "sha256": "eee9a38c31ada7782cf7fd8d741a7fa576965353fb3442026fb8d402d016b98e"
+    },
+    {
+      "name": "shell",
+      "path": "src/runtime/shell.js",
+      "sha256": "f75e422fbbec8c41efff64a2d3eb3123c563a892470df410e0801a0d3ddb8581"
+    },
+    {
+      "name": "runtime",
+      "path": "src/runtime/runtime.js",
+      "sha256": "96fa1a02c924495d1f9220b5183086deba3f6770284e189a7303ba418bd32613"
+    },
+    {
+      "name": "icons",
+      "path": "src/runtime/icons.js",
+      "sha256": "d274432068eebe462ba039949dde84ad2eb5c81836e6de502df7e1565e7bf325"
+    },
+    {
+      "name": "card-guard",
+      "path": "src/runtime/card-guard.js",
+      "sha256": "cf1b7b2f42cb6f7ff3d41ce1250fe6760a00b7486d1907b10f0dd3f0f2a3cd75"
+    },
+    {
+      "name": "investment-core",
+      "path": "src/runtime/investment-core.js",
+      "sha256": "f0235a080078f448173219f1646b893497915696c288f2fee6f42e67164198b2"
+    },
+    {
+      "name": "investment-guard",
+      "path": "src/runtime/investment-guard.js",
+      "sha256": "ae242ec2561b61376fa678b2f69467a8c36f5b9e0856d44fe6b60bb63acde108"
+    }
+  ]
+}
