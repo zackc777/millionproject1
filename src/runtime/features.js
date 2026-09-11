@@ -432,6 +432,8 @@ window.MILLIONPROJECT_BUDGET_UX_VERSION="budget-25";
   const money25=n=>'NT$'+Math.round(+n||0).toLocaleString('zh-TW');
   const esc25=s=>String(s??'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":'&#39;'}[m]));
   const selected25=()=>{try{return (typeof selectedMonth==='function'?selectedMonth():(document.getElementById('salary_month')?.value||new Date().toISOString().slice(0,7))).slice(0,7)}catch(_){return new Date().toISOString().slice(0,7)}};
+  let profileMutation=Promise.resolve();
+  let lifeRenderVersion=0;
 
   function readProfile(){
     let p={};
@@ -455,21 +457,40 @@ window.MILLIONPROJECT_BUDGET_UX_VERSION="budget-25";
     }catch(e){alert('生活預算儲存失敗：'+e.message);return false}
   }
 
+  function formAmounts(){
+    const values={};
+    for(const k of KEYS){
+      const input=document.getElementById('bp_'+k);
+      if(input)values[k]=Math.max(0,+input.value||0);
+    }
+    return values;
+  }
+
+  function queueProfileMutation(change){
+    const values=formAmounts();
+    const run=async()=>{
+      const p=readProfile();
+      for(const [key,value] of Object.entries(values))p[key]=value;
+      if(change)change(p);
+      if(!await persistProfile(p,false))return false;
+      await enhanceLifeBudget();
+      return true;
+    };
+    const next=profileMutation.then(run,run);
+    profileMutation=next.then(()=>undefined,()=>undefined);
+    return next;
+  }
+
   window.mpLifeSave=async()=>{
-    const p=readProfile();
-    for(const k of KEYS)p[k]=Math.max(0,+(document.getElementById('bp_'+k)?.value??p[k])||0);
-    if(!await persistProfile(p,false))return;
-    await enhanceLifeBudget();
-    if(typeof mpToast==='function')mpToast('生活預算已同步');
+    if(await queueProfileMutation()&&typeof mpToast==='function')mpToast('生活預算已同步');
   };
 
   window.mpLifeToggle=async key=>{
-    const p=readProfile();
-    p.__fixed={...DEFAULT_FIXED,...(p.__fixed||{})};
-    p.__fixed[key]=!p.__fixed[key];
-    for(const k of KEYS)p[k]=Math.max(0,+(document.getElementById('bp_'+k)?.value??p[k])||0);
-    if(!await persistProfile(p,false))return;
-    await enhanceLifeBudget();
+    if(!META[key])return;
+    await queueProfileMutation(p=>{
+      p.__fixed={...DEFAULT_FIXED,...(p.__fixed||{})};
+      p.__fixed[key]=!p.__fixed[key];
+    });
   };
 
   function isLifeCategory(entry,key){
@@ -484,6 +505,11 @@ window.MILLIONPROJECT_BUDGET_UX_VERSION="budget-25";
   }
 
   async function monthEntries(month){
+    try{
+      const cached=window.__mpMonthView;
+      if(cached?.userId===u?.id&&cached.state?.month===month&&Array.isArray(cached.state.current))
+        return cached.state.current.filter(x=>x.entry_type==='expense');
+    }catch(_){}
     try{
       if(typeof q==='function')return (await q('finance_entries',{order:'entry_date'})).filter(x=>String(x.month||'').slice(0,7)===month&&x.entry_type==='expense');
     }catch(_){}
@@ -525,28 +551,32 @@ window.MILLIONPROJECT_BUDGET_UX_VERSION="budget-25";
 
   async function enhanceLifeBudget(){
     let t='o';try{t=tab||'o'}catch(_){}if(t!=='m')return;
-    const grid=document.querySelector('.finance-layout .budget-grid');
-    if(!grid)return;
-    const card=grid.closest('.card');if(!card)return;
+    const version=++lifeRenderVersion;
+    const card=document.getElementById('mp-life-budget-card');if(!card)return;
     const p=readProfile(),month=selected25(),entries=await monthEntries(month);
+    if(version!==lifeRenderVersion||selected25()!==month||document.getElementById('mp-life-budget-card')!==card)return;
     const fixedTotal=KEYS.filter(k=>p.__fixed?.[k]).reduce((s,k)=>s+(+p[k]||0),0);
     const flexTotal=KEYS.filter(k=>!p.__fixed?.[k]).reduce((s,k)=>s+(+p[k]||0),0);
     const total=fixedTotal+flexTotal;
     const lifeSpent=KEYS.reduce((s,k)=>s+entries.filter(x=>isLifeCategory(x,k)).reduce((a,x)=>a+(+x.amount||0),0),0);
     const left=Math.max(0,total-lifeSpent);
-    const fixedDone=KEYS.filter(k=>p.__fixed?.[k]&&statusFor(entries,k,+p[k]||0).done).length;
-    const fixedCount=KEYS.filter(k=>p.__fixed?.[k]&&(+p[k]||0)>0).length;
+    const fixedKeys=KEYS.filter(k=>p.__fixed?.[k]);
+    const payableFixedKeys=fixedKeys.filter(k=>(+p[k]||0)>0);
+    const fixedDone=payableFixedKeys.filter(k=>statusFor(entries,k,+p[k]||0).done).length;
+    const fixedCount=fixedKeys.length;
+    const payableFixedCount=payableFixedKeys.length;
 
     card.classList.add('mp25-life-card');
+    card.dataset.mpLifeRenderer='single-source-v26';
     card.innerHTML=`
       <div class="mp25-life-head">
-        <div><div class="section-kicker">STEP 2 · LIFE FIRST</div><h3>② 先保留整月生活責任</h3><div class="tiny">先決定「一定要留多少」，實際支出仍在付款發生時才記帳。</div></div>
+        <div><div class="section-kicker">STEP 2 · LIFE FIRST</div><h3>② 設定生活預算</h3><div class="tiny">固定責任與彈性上限只在這裡設定；真正付款時才列入支出。</div></div>
         <div class="mp25-life-total"><span>本月預留</span><b>${money25(total)}</b></div>
       </div>
-      <div class="mp25-life-summary">
-        <div><span>固定責任</span><b>${money25(fixedTotal)}</b><small>${fixedCount} 個固定項目</small></div>
-        <div><span>彈性預算</span><b>${money25(flexTotal)}</b><small>可調整的生活上限</small></div>
-        <div><span>本月生活餘額</span><b>${money25(left)}</b><small>生活類支出已用 ${money25(lifeSpent)}</small></div>
+      <div class="mp25-life-overview">
+        <div><span>已記生活支出</span><b>${money25(lifeSpent)}</b></div>
+        <div><span>尚須預留</span><b>${money25(left)}</b></div>
+        <div class="mp25-life-mix"><span>預算結構</span><b>固定 ${fixedCount} 項 · 彈性 ${KEYS.length-fixedCount} 項</b><small>固定 ${money25(fixedTotal)} · 彈性 ${money25(flexTotal)}</small></div>
       </div>
       <div class="mp25-life-list">
         ${KEYS.map(k=>{const m=META[k],fixed=!!p.__fixed?.[k],st=statusFor(entries,k,+p[k]||0);return `<div class="mp25-life-row">
@@ -559,23 +589,20 @@ window.MILLIONPROJECT_BUDGET_UX_VERSION="budget-25";
       </div>
       <div class="mp25-life-actions">
         <button class="btn main" onclick="mpLifeSave()">儲存生活規劃</button>
-        <button class="btn soft" onclick="mpLifeFixedSheet()">固定支出進度 ${fixedDone}/${fixedCount}</button>
-        <span class="tiny">固定／彈性可直接切換；設定會同步到手機與電腦。</span>
+        <button class="btn soft" onclick="mpLifeFixedSheet()">查看待付款 ${Math.max(0,payableFixedCount-fixedDone)} 項</button>
+        <span class="tiny">點「固定／彈性」只會更新這張卡與右側建議，不會切換或複製版面。</span>
       </div>`;
   }
   window.mpEnhanceLifeBudget=enhanceLifeBudget;
 
   const css=`
   .mp25-life-card{overflow:hidden}.mp25-life-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px}.mp25-life-head h3{margin:3px 0}.mp25-life-total{min-width:150px;text-align:right;background:#0f172a;color:#fff;border-radius:15px;padding:10px 13px}.mp25-life-total span{display:block;font-size:10px;color:#cbd5e1;font-weight:800}.mp25-life-total b{display:block;font-size:20px;margin-top:1px}
-  .mp25-life-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.mp25-life-summary>div{border:1px solid #e5e7eb;border-radius:14px;padding:11px;background:#f8fafc}.mp25-life-summary span,.mp25-life-summary small{display:block;color:#64748b;font-size:10px}.mp25-life-summary b{display:block;font-size:18px;margin:2px 0}.mp25-life-summary small{line-height:1.35}
+  .mp25-life-overview{display:grid;grid-template-columns:.8fr .8fr 1.4fr;gap:8px;margin:14px 0}.mp25-life-overview>div{border:1px solid #e5e7eb;border-radius:14px;padding:11px;background:#f8fafc}.mp25-life-overview span,.mp25-life-overview small{display:block;color:#64748b;font-size:10px}.mp25-life-overview b{display:block;font-size:18px;margin:2px 0}.mp25-life-overview small{line-height:1.35}.mp25-life-mix b{font-size:14px}
   .mp25-life-list{border:1px solid #e5e7eb;border-radius:16px;overflow:hidden}.mp25-life-row{display:grid;grid-template-columns:34px minmax(170px,1fr) 64px 145px 104px;gap:10px;align-items:center;padding:10px 12px;background:#fff;border-bottom:1px solid #edf0f4}.mp25-life-row:last-child{border-bottom:0}.mp25-life-icon{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:#eef4ff;color:#2563eb;font-weight:900}.mp25-life-copy b,.mp25-life-copy span{display:block}.mp25-life-copy span{font-size:10px;color:#7b8494;margin-top:1px}.mp25-mode{border:0;border-radius:999px;padding:6px 8px;font-size:10px;font-weight:900;cursor:pointer}.mp25-mode.fixed{background:#e0e7ff;color:#3730a3}.mp25-mode.flex{background:#f1f5f9;color:#475569}.mp25-amt{display:flex;align-items:center;border:1px solid #dfe4ec;border-radius:11px;background:#fff;overflow:hidden}.mp25-amt span{padding-left:9px;color:#94a3b8;font-size:10px;font-weight:800}.mp25-amt input{width:100%;border:0!important;box-shadow:none!important;outline:0;padding:8px 8px 8px 4px!important;min-height:36px!important;background:transparent!important;font-weight:800}.mp25-state{text-align:right}.mp25-life-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
   .mp25-sheetback{position:fixed;inset:0;z-index:10010;background:rgba(15,23,42,.38);display:grid;place-items:center;padding:14px}.mp25-sheet{width:min(560px,100%);background:#fff;border-radius:22px;padding:16px;box-shadow:0 26px 80px rgba(15,23,42,.25);max-height:82vh;overflow:auto}.mp25-fixed-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #edf0f4}.mp25-fixed-row:last-child{border-bottom:0}
-  @media(max-width:900px){.mp25-life-head{display:block}.mp25-life-total{margin-top:10px;width:100%;text-align:left}.mp25-life-summary{grid-template-columns:1fr 1fr}.mp25-life-summary>div:last-child{grid-column:1/-1}.mp25-life-row{grid-template-columns:32px minmax(0,1fr) 58px 115px;padding:10px}.mp25-state{grid-column:2/-1;text-align:left;margin-top:-4px}.mp25-life-copy span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mp25-life-actions .btn{flex:1}.mp25-sheetback{place-items:end center;padding:8px}.mp25-sheet{border-radius:22px 22px 12px 12px;max-height:88vh}}
-  @media(max-width:430px){.mp25-life-summary{grid-template-columns:1fr}.mp25-life-summary>div:last-child{grid-column:auto}.mp25-life-row{grid-template-columns:30px minmax(0,1fr) 54px}.mp25-amt{grid-column:2/-1}.mp25-state{grid-column:2/-1}.mp25-mode{justify-self:end}.mp25-life-actions{display:grid;grid-template-columns:1fr 1fr}.mp25-life-actions .tiny{grid-column:1/-1}}
+  @media(max-width:900px){.mp25-life-head{display:block}.mp25-life-total{margin-top:10px;width:100%;text-align:left}.mp25-life-overview{grid-template-columns:1fr 1fr}.mp25-life-mix{grid-column:1/-1}.mp25-life-row{grid-template-columns:32px minmax(0,1fr) 58px 115px;padding:10px}.mp25-state{grid-column:2/-1;text-align:left;margin-top:-4px}.mp25-life-copy span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mp25-life-actions .btn{flex:1}.mp25-sheetback{place-items:end center;padding:8px}.mp25-sheet{border-radius:22px 22px 12px 12px;max-height:88vh}}
+  @media(max-width:430px){.mp25-life-overview{grid-template-columns:1fr 1fr}.mp25-life-mix{grid-column:1/-1}.mp25-life-row{grid-template-columns:30px minmax(0,1fr) 54px}.mp25-amt{grid-column:2/-1}.mp25-state{grid-column:2/-1}.mp25-mode{justify-self:end}.mp25-life-actions{display:grid;grid-template-columns:1fr 1fr}.mp25-life-actions .tiny{grid-column:1/-1}}
   `;
   const st=document.createElement('style');st.id='mp-budget25-style';st.textContent=css;document.head.appendChild(st);
 
-  const oldRender=window.render;
-  if(typeof oldRender==='function'&&!oldRender.__mpBudget25){const w=async function(){const r=await oldRender.apply(this,arguments);await enhanceLifeBudget();return r};w.__mpBudget25=true;window.render=w;try{render=w}catch(_){}}
-  setTimeout(enhanceLifeBudget,180);
 })();

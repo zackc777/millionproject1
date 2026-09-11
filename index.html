@@ -917,7 +917,6 @@ async function monthly(){
   window.__mpMonthView={userId:u.id,state};
   const income=state.monthIncome,expense=state.monthExpense,saving=state.monthSaving,investment=state.monthInvestment,remaining=state.monthUnallocated;
   let b=getBudgetProfile(),planned=plannedLivingTotal(),plan=MPFinanceModel.rolling(state,b,getEmergencyGoalCached()),spendPct=planned?Math.min(100,expense/planned*100):0,eTarget=getEmergencyGoalCached();
-  let fixed=await fixedTemplates(),templateKeys=new Set(fixed.map(x=>((String(x.note||'').match(/\[KEY:([^\]]+)\]/)||[])[1])).filter(Boolean));
   const p=monthFlowParts(state),incomeBase=Math.max(income,state.monthCashOut+saving+investment+Math.max(0,remaining),1),unalloc=Math.max(0,remaining);
 
   const allMonths=monthOptionList([
@@ -1006,15 +1005,10 @@ async function monthly(){
   </section>
 
   <section class="finance-layout" style="margin-top:14px">
-    <div class="card">
-      <div class="section-title"><div><div class="section-kicker">STEP 2 · LIFE FIRST</div><h3>② 先保留整月生活責任</h3><div class="tiny">固定支出設定一次；變動項目是預算上限，不代表已經花掉。</div></div><span class="pill">預留 ${money(planned)}</span></div>
-      <div class="budget-grid">
-        ${[['rent','房租／住宿'],['family','父母／家庭'],['telecom','電信／網路'],['gym','健身／健康'],['daily','餐飲／交通／日常'],['leisure','娛樂／治裝彈性']].map(([k,label])=>`<div class="budget-card"><div class="split"><div class="label">${label}</div>${FIXED_KEYS.includes(k)?`<label class="tiny"><input id="fix_${k}" type="checkbox" ${templateKeys.has(k)?'checked':''}> 每月固定</label>`:'<span class="tiny">預算上限</span>'}</div><input class="mini-input" id="bp_${k}" type="number" value="${b[k]}" onchange="saveBudgetProfile()"></div>`).join('')}
-      </div>
-      <div class="fixed-actions"><button class="btn ghost" onclick="saveFixedTemplates()">💾 儲存固定支出模板</button><button class="btn soft" onclick="applyFixedExpenses()">⚡ 一鍵加入 ${selected} 固定支出</button></div>
-      <div class="status-note" style="margin-top:10px"><b>固定項目只設定一次。</b> 每個月切到該月後按「一鍵加入」，系統會防止同月重複加入。</div>
+    <div id="mp-life-budget-card" class="card" aria-live="polite">
+      <div class="section-kicker">STEP 2 · LIFE FIRST</div><h3>② 生活預算設定</h3><div class="empty">正在整理本月生活責任…</div>
     </div>
-    <div id="allocBox" class="card"><div class="empty">系統正在計算本月配置…</div></div>
+    <div id="allocBox" class="card" aria-live="polite"><div class="empty">系統正在計算本月配置…</div></div>
   </section>
 
   <section class="grid g2" style="margin-top:14px">
@@ -1060,6 +1054,7 @@ async function monthly(){
   refreshEntryCategories();
   renderEntryTable(entries,state);
   previewAllocation();
+  if(typeof window.mpEnhanceLifeBudget==='function')await window.mpEnhanceLifeBudget();
 }
 // ===== end v8 month center =====
 
