@@ -36,8 +36,8 @@
 
 最新補強：卡費增加先降低追加配置；繳清已預留帳單後，不重複縮減可配置金額。日常可用金額先扣待繳卡債、未付固定生活費與超出生活預算的未出帳預留，再限制於剩餘變動生活預算。每日上限與信用卡全卡共用可刷池採相同計算。現金不足時追加存款／投資為零，顯示缺口；帳單或預留資料不足時，日常可用顯示待核對。新增三項回歸案例驗證上述規則，不新增另一份使用者金流紀錄。
 
-PR #4：https://github.com/zackc777/millionproject1/pull/4。Vercel 預覽曾回報 Ready，但重新讀取 deployment 明確回覆 403：Not authorized under scope z9000282-8151。尚未完成候選頁桌機／手機驗收，未合併 main。
+PR #4 已合併，正式 `main` 為 `bffb6cadc862f13d209e9436fe9f85249f9fad7d`。分享預覽登入後已驗收帳單預覽、現有繳款、信用卡頁、每月財務及桌機 sidebar；正式 HTML、release manifest 與 15 個模組經 `scripts/verify-release.mjs` 核對一致。瀏覽器不提供手機 viewport 切換，手機實機由使用者上線後回饋。
 
-資料庫 migration 已套用並驗證。不可重播 supabase/history。前端先核對 preview HTML、release.json、15 個 JS 與候選 SHA，完成桌機／手機驗收後才合併 main；再執行 scripts/verify-release.mjs。
+資料庫 migration 已套用並驗證。不可重播 supabase/history。前端已合併並完成正式 endpoint 核對；後續修正仍須沿用相同 preview、合併與 `scripts/verify-release.mjs` 驗證流程。
 
 一旦有使用者登錄帳單，不可把前端回退到完全不讀帳單的版本，否則低估卡債。應以前向修正為主；需要回退 UI 時仍保留新金流模型及帳單資料讀取。不得刪除資料表作為回退。
