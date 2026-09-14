@@ -1,5 +1,7 @@
 # 維護交接
 
+> 2026-09-14：正式 `main` 為 `626e367d7cbc1281db70784cae9f12f5e7976147`（PR #1–#3 已合併）。新的帳單模式在 `codex/card-statements`，尚未合併；新增帳單 table／RLS／guard 已套用，SQL 測試已回滾，未搬移既有使用者資料。完整規格與驗收缺口見 `docs/STATEMENTS-2026-09-14.md`。以下早期交接內容保留作歷史紀錄。
+
 > 2026-09-11：GitHub 寫入已恢復。PR #1 為來源封存，draft PR #2 包含固定 build、信用卡修正與本輪現金流／滾動配置。36 項離線測試通過；尚未合併或上線。詳細進度見 `docs/CASHFLOW-2026-09-11.md`。
 
 目標只有 `zackc777/millionproject1`。正式分支 `main`，正式站 https://millionproject1.vercel.app/。

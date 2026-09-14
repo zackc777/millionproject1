@@ -1,7 +1,7 @@
 function mpCashFlowHtml(st) {
   return `<div class="finance-kpis mp-cash-summary">
     <div class="finance-kpi"><div class="label">本月現金支出／扣款</div><div class="num">${money(st.monthCashOut)}</div><div class="tiny">現金消費 ${money(st.monthCashExpense)} ＋ 繳卡費 ${money(st.monthCardPayments)}</div></div>
-    <div class="finance-kpi"><div class="label">本月消費支出</div><div class="num">${money(st.monthExpense)}</div><div class="tiny">含刷卡 ${money(st.monthCardSpend)}；繳卡費不重複認列消費</div></div>
+    <div class="finance-kpi"><div class="label">本月消費認列</div><div class="num">${money(st.monthExpense)}</div><div class="tiny">含信用卡 ${money(st.monthCardSpend)}；已對帳採結帳月份，其餘採消費日，付款不重複認列</div></div>
     <div class="finance-kpi"><div class="label">本月資金餘額</div><div class="num">${money(st.monthUnallocated)}</div><div class="tiny">收入扣除現金扣款、存款與實際投資</div></div>
     <div class="finance-kpi"><div class="label">尚待繳卡費</div><div class="num">${money(st.cardDebt)}</div><div class="tiny">包含未出帳與以前月份未清餘額；先預留再配置</div></div>
   </div>${st.unmatchedPayments ? `<div class="status-note" style="margin-top:10px">有 ${money(st.unmatchedPayments)} 繳款超過系統中對應帳單的消費，可能是舊帳單、溢繳或漏記刷卡。現金已扣除，請核對原帳單；系統不會自動補成當月消費。</div>` : ''}${st.unresolved ? '<div class="status-note" role="status">有舊卡片紀錄尚無法唯一歸屬，追加配置暫停建議。請在原明細選擇正確卡片。</div>' : ''}`;
@@ -13,7 +13,7 @@ function mpRollingAllocationHtml(st, plan) {
   const focusValue=plan.mode==='future'?'—':money(shortfall||Math.max(0,plan.afterReserve));
   const focusHint=plan.mode==='past'?'僅供回顧，不產生今天的轉帳建議。':plan.mode==='future'?'未來收入與交易尚未發生，不列為可用資金。':shortfall?'先暫停追加存款與投資，核對生活預算及待繳帳單。':'此金額仍包含下方現金緩衝、預備金與投資上限。';
   const steps=[
-    ['生活責任',plan.remainingLiving,`整月預估 ${money(plan.forecast)} · 已消費 ${money(st.monthExpense)}`,'life'],
+    ['生活與未出帳預留',plan.necessaryReserve??plan.remainingLiving,`生活餘額 ${money(plan.remainingLiving)} · 未出帳估計 ${money(plan.unbilledReserve)}；用途未確認，先取較高者`,'life'],
     ...(st.cardDebt>0?[['信用卡待繳',st.cardDebt,'包含未出帳及以前月份尚未繳清金額','card']]:[]),
     ...(plan.gap>0||plan.emergency>0?[['預備金',plan.emergency,`目前 ${money(st.emergency)} · 距目標 ${money(plan.gap)}`,'reserve']]:[]),
     ['現金緩衝',plan.flex,'保留約一週變動生活費，不會轉出','buffer'],
@@ -23,17 +23,18 @@ function mpRollingAllocationHtml(st, plan) {
     <p class="muted">依截至 ${esc(st.asOf)} 的實際金流即時重算；只顯示接下來要保留或可安排的金額。</p>
     <div class="mp-plan-focus ${shortfall&&current?'warn':''}"><span>${focusLabel}</span><b>${focusValue}</b><small>${focusHint}</small></div>
     <div class="mp-plan-list">${steps.map(([label,value,hint,type],i)=>`<div class="mp-plan-row ${!value?'zero':''}"><i class="${type}">${i+1}</i><div><b>${esc(label)}</b><span>${esc(hint)}</span></div><strong>${money(value)}</strong></div>`).join('')}</div>
-    <div class="mp-plan-formula">可運用 ${money(plan.cashBase)} − 卡費 ${money(st.cardDebt)} − 生活預留 ${money(plan.remainingLiving)} = ${money(plan.afterReserve)}</div>`;
+    ${plan.uncertain?'<p class="status-note">缺最近一期帳單或未出帳估計依據。補登帳單或設定刷卡預留後才顯示追加配置；以下餘額尚未代表可以投資。</p>':''}
+    <div class="mp-plan-formula">可運用 ${money(plan.cashBase)} − 卡費 ${money(st.cardDebt)} − 生活／未出帳預留 ${money(plan.necessaryReserve??plan.remainingLiving)} = ${money(plan.afterReserve)}</div>`;
 }
 function mpSpendingReviewHtml(st, plan) {
-  const comparison = plan.expenseDelta === null ? '上月資料不足，暫不比較。' : `較上月${plan.mode === 'current' ? '同期' : ''}${plan.expenseDelta > 0 ? '增加' : '減少'} ${money(Math.abs(plan.expenseDelta))}。`;
+  const comparison = st.statements?.length?'帳單跨月且集中結帳，暫不與逐日消費作同期比較；逐卡趨勢請看信用卡帳單。':plan.expenseDelta === null ? '上月資料不足，暫不比較。' : `較上月${plan.mode === 'current' ? '同期' : ''}${plan.expenseDelta > 0 ? '增加' : '減少'} ${money(Math.abs(plan.expenseDelta))}。`;
   const over = Math.max(0, plan.forecast - plan.planned);
   return `<div class="section-kicker">SPENDING REVIEW · ${esc(st.month)}</div><h3>${plan.mode === 'past' ? '這個月花費回顧' : '花費變化與下一步'}</h3>
     <div class="smart-alert ${over ? 'warn' : 'good'}"><b>${plan.top ? `${esc(plan.top.label)}已超過設定預算 ${money(plan.top.spent - plan.top.budget)}` : '已記錄消費未超過各類預算'}</b><div>${comparison}</div></div>
     <div class="advice-list">
       <div class="advice-item"><span>${plan.mode === 'past' ? '整月實際消費' : '整月消費預估'}</span><b>${money(plan.forecast)}</b></div>
       <div class="advice-item"><span>生活預算</span><b>${money(plan.planned)}</b></div>
-      ${plan.mode === 'current' ? `<div class="advice-item"><span>剩餘 ${plan.remainingDays} 天，每日預算上限</span><b>${money(plan.dailyLimit)}</b></div>` : ''}
+      ${plan.mode === 'current' ? `<div class="advice-item"><span>接下來可用於日常花費</span><b>${plan.uncertain||st.unresolved?'待核對':money(plan.spendingAvailable)}</b></div><div class="advice-item"><span>剩餘 ${plan.remainingDays} 天，每日預算上限</span><b>${plan.uncertain||st.unresolved?'待核對':money(plan.dailyLimit)}</b></div><p class="tiny">已保留待繳卡費、未付固定費用與額外未出帳預留。日常可用金額包含在生活預留內，不可再加到投資配置。</p>` : ''}
     </div>
     <p class="tiny">${plan.historyMonths ? `參考最近三個月中 ${plan.historyMonths} 個有消費紀錄的月份` : '歷史資料不足，先使用你設定的生活預算'}；固定項目保留尚未支付部分，可分類的變動項目取預算、歷史中位數與本月速度的較高值。未分類與帳單彙總不推估重複消費。本月未滿 7 天不推估消費速度；漏記會影響結果。</p>
     ${plan.categories.filter(x => x.spent || x.budget || x.remaining).map(x => `<div class="mp-category-review"><b>${esc(x.label)}</b><span>已花 ${money(x.spent)} · ${plan.mode === 'past' ? '預算' : '預估'} ${money(plan.mode === 'past' ? x.budget : x.forecast)}</span></div>`).join('')}

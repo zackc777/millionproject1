@@ -5,7 +5,7 @@ export const read = file => readFileSync(new URL('../'+file, import.meta.url), '
 export const plain = value => JSON.parse(JSON.stringify(value));
 export function harness(now='2026-09-18T04:00:00Z') {
   const elements=new Map(), events=new Map(), timers=[], alerts=[], writes=[], snapshots=[];
-  const db={credit_cards:[], finance_entries:[], credit_card_payments:[], investment_transactions:[]};
+  const db={credit_cards:[], finance_entries:[], credit_card_payments:[], credit_card_statements:[], investment_transactions:[]};
   let failTable=null;
   function element() {
     return {value:'',innerHTML:'',textContent:'',style:{},dataset:{},options:[],children:[],
@@ -65,7 +65,7 @@ export function harness(now='2026-09-18T04:00:00Z') {
   ctx.readMoneyTable=async(table)=>{const result=await ctx.c.from(table).select('*').eq('user_id',ctx.u.id);if(result.error)throw new Error(result.error.message);return result.data};
   ctx.esc=value=>String(value??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
   ctx.money=value=>'NT$'+Math.round(+value||0).toLocaleString();
-  load('src/card-model.js');load('src/card-service.js');load('src/finance-model.js');load('src/finance-view.js');
+  load('src/card-model.js');load('src/card-service.js');load('src/statement-model.js');load('src/finance-model.js');load('src/finance-view.js');load('src/statements.js');
   return {ctx,db,app,elements,events,timers,alerts,writes,prompts,snapshots,field,load,loadFinance,
     fail:table=>{failTable=table}};
 }

@@ -158,11 +158,11 @@ async function readMoneyTable(table,order){
 }
 async function moneyEngine(targetMonth){
   const month=monthKey(targetMonth)||MPCardModel.today().slice(0,7);
-  const [entries,payments,cards,holdings]=await Promise.all([
+  const [entries,payments,cards,holdings,statements]=await Promise.all([
     readMoneyTable('finance_entries','entry_date'),readMoneyTable('credit_card_payments','payment_date'),
-    readMoneyTable('credit_cards','created_at'),readMoneyTable('portfolio','updated_at')
+    readMoneyTable('credit_cards','created_at'),readMoneyTable('portfolio','updated_at'),readMoneyTable('credit_card_statements','cycle_end')
   ]);
-  const st=MPFinanceModel.ledger({month,entries,payments,cards});
+  const st=MPFinanceModel.ledger({month,entries,payments,cards,statements});
   const portfolioCost=holdings.reduce((n,x)=>n+(+x.quantity||0)*(+x.avg_cost||0),0);
   const portfolioValue=holdings.reduce((n,x)=>n+(+x.current_value||((+x.quantity||0)*(+x.current_price||0))||((+x.quantity||0)*(+x.avg_cost||0))),0);
   const untrackedInvestment=Math.max(0,st.totalInvestment-portfolioCost);
@@ -359,7 +359,8 @@ function renderEntryTable(entries,state){
     const payment=x.kind==='payment',type=payment?'繳卡費':({expense:'消費支出',income:'收入',saving:'存款',investment:'投資'}[x.entry_type]||x.entry_type);
     const cells=[x.date,type,payment?'帳單 '+String(x.cycle_end).slice(0,10):(x.category||''),money(x.amount),payment?x.issuer:(x.payment_method||'—'),payment?((x.note||'')+' · 已扣現金，不重複計消費'):(x.note||'')];
     const labels=['日期','類型','用途','金額','付款方式','備註'];
-    return `<tr>${cells.map((value,i)=>`<td data-label="${labels[i]}" ${i===3?'class="entry-amt"':''}>${esc(value)}</td>`).join('')}<td data-label="操作"><div class="research-actions"><button class="btn ghost" onclick="${payment?'mpEditCardPayment':'editFinanceEntry'}('${x.id}')">編輯</button><button class="btn danger-btn" onclick="${payment?'mpDeleteCardPayment':'deleteFinanceEntry'}('${x.id}')">刪除</button></div></td></tr>`;
+    const actions=x.statement_id?`<button class="btn ghost" onclick="mpEditStatement('${x.statement_id}')">查看／編輯帳單</button>`:`<button class="btn ghost" onclick="${payment?'mpEditCardPayment':'editFinanceEntry'}('${x.id}')">編輯</button><button class="btn danger-btn" onclick="${payment?'mpDeleteCardPayment':'deleteFinanceEntry'}('${x.id}')">刪除</button>`;
+    return `<tr>${cells.map((value,i)=>`<td data-label="${labels[i]}" ${i===3?'class="entry-amt"':''}>${esc(value)}</td>`).join('')}<td data-label="操作"><div class="research-actions">${actions}</div></td></tr>`;
   }).join('')||'<tr><td colspan="7" class="empty">這個月尚無收支或卡費繳款。</td></tr>';
 }
 async function addFinanceEntry(){
