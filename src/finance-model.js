@@ -43,11 +43,13 @@
       closed:x.cycleEnd < asOf, overdue:!!x.dueDate && x.dueDate < asOf && x.spent > x.paid })).sort((a, b) => a.cycleEnd.localeCompare(b.cycleEnd));
     return { bills:rows, cardDebt:rows.reduce((n, x) => n + x.outstanding, 0), unmatchedPayments:rows.reduce((n, x) => n + x.unmatched, 0), unresolved };
   }
-  function ledger({ month, entries = [], payments = [], cards = [], today = cardModel.today() }) {
+  function ledger({ month, entries = [], payments = [], cards = [], statements = [], today = cardModel.today() }) {
     cardModel.parts(month + '-01');
     const next = cardModel.shiftMonth(month + '-01', 1);
     const end = new Date(Date.parse(next + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
     const asOf = today < end ? today : end;
+    const rawEntries=entries;
+    if(statements.length)entries=root.MPStatementModel.reconcile(entries,statements,cards,asOf);
     const all = entries.filter(x => String(x.month).slice(0, 7) !== '1900-01' && date(x) <= asOf);
     const current = all.filter(x => monthOf(x) === month);
     const allPayments = payments.filter(x => String(x.payment_date).slice(0, 10) <= asOf);
@@ -55,7 +57,7 @@
     const totals = rows => ({ Income:sum(rows.filter(x => x.entry_type === 'income')), Expense:sum(rows.filter(x => x.entry_type === 'expense')),
       Saving:sum(rows.filter(x => x.entry_type === 'saving')), Investment:sum(rows.filter(x => x.entry_type === 'investment')),
       CashExpense:sum(rows.filter(x => x.entry_type === 'expense' && !isCard(x, cards))), CardSpend:sum(rows.filter(x => x.entry_type === 'expense' && isCard(x, cards))) });
-    const st = { month, asOf, all, current, cards, allPayments, monthPayments };
+    const st = { month, asOf, all, current, cards, allPayments, monthPayments, statements:statements.filter(s=>s.cycle_end<=asOf),rawEntries };
     for (const [prefix, rows] of [['total', all], ['month', current]]) for (const [key, value] of Object.entries(totals(rows))) st[prefix + key] = value;
     st.monthCardPayments = sum(monthPayments); st.totalCardPayments = sum(allPayments);
     st.monthCashOut = st.monthCashExpense + st.monthCardPayments;
@@ -65,7 +67,15 @@
     st.emergency = sum(all.filter(x => x.entry_type === 'saving' && String(x.category).includes('緊急預備金')));
     st.otherSaving = st.totalSaving - st.emergency;
     st.cashLike = st.liquidCash + st.totalSaving;
-    return Object.assign(st, cardBalances(all, allPayments, cards, asOf));
+    Object.assign(st,statements.length?root.MPStatementModel.balances(all,allPayments,cards,statements,asOf):cardBalances(all,allPayments,cards,asOf));
+    if(statements.length&&st.unresolved){
+      const legacyEntries=all.filter(e=>!cards.some(c=>cardModel.matchesRecord(e,c,cards)));
+      const legacyPayments=allPayments.filter(p=>!cards.some(c=>cardModel.matchesRecord(p,c,cards,'issuer')));
+      const legacy=cardBalances(legacyEntries,legacyPayments,cards,asOf);
+      st.bills.push(...legacy.bills);st.cardDebt+=legacy.cardDebt;st.unmatchedPayments+=legacy.unmatchedPayments;
+    }
+    st.statementReserve=statements.length?root.MPStatementModel.reserve(st):{rows:[],total:0,uncertain:false};
+    return st;
   }
   function rolling(st, profile, target, today = cardModel.today()) {
     const mode = st.month < today.slice(0, 7) ? 'past' : st.month > today.slice(0, 7) ? 'future' : 'current';
@@ -80,9 +90,10 @@
       const spent = sum(expenses.filter(x => categoryKey(x) === key));
       const budget = Math.max(0, Number(profile[key]) || 0);
       const fixed = profile.__fixed?.[key] ?? ['rent', 'family', 'telecom', 'gym'].includes(key);
-      const samples = observedMonths.map(m => sum(st.all.filter(x => x.entry_type === 'expense' && monthOf(x) === m && categoryKey(x) === key))).sort((a, b) => a - b);
+      const samples = observedMonths.map(m => sum(st.all.filter(x => x.entry_type === 'expense' && !x.one_off && monthOf(x) === m && categoryKey(x) === key))).sort((a, b) => a - b);
       const history = samples.length ? samples[Math.floor(samples.length / 2)] : 0;
-      const pace = key !== 'other' && elapsed >= 7 ? spent / elapsed * days : 0;
+      const pacedSpend=sum(expenses.filter(x=>categoryKey(x)===key&&!x.statement_id&&!x.one_off));
+      const pace = key !== 'other' && elapsed >= 7 ? pacedSpend / elapsed * days : 0;
       // Fixed bills do not extrapolate by daily pace. Variable budgets never shrink
       // automatically just because early-month records are sparse.
       const forecast = mode === 'past' || key === 'other' ? spent : fixed ? Math.max(spent, budget) : Math.max(spent, budget, history, pace);
@@ -92,8 +103,13 @@
     const forecast = st.monthExpense + remainingLiving;
     const planned = keys.reduce((n, key) => n + Math.max(0, Number(profile[key]) || 0), 0);
     const cashBase = Math.min(st.monthUnallocated, st.liquidCash);
-    const afterReserve = cashBase - st.cardDebt - remainingLiving;
-    const available = mode === 'current' && !st.unresolved ? Math.max(0, Math.floor(afterReserve)) : 0;
+    // Unclassified upcoming card spending may already be part of living budgets.
+    // Reserve the larger pool, not their sum; do not claim exact categorisation.
+    const unbilledReserve=st.statementReserve?.total||0;
+    const necessaryReserve=Math.max(remainingLiving,unbilledReserve);
+    const uncertain=!!st.statementReserve?.uncertain;
+    const afterReserve = cashBase - st.cardDebt - necessaryReserve;
+    const available = mode === 'current' && !st.unresolved && !uncertain ? Math.max(0, Math.floor(afterReserve)) : 0;
     const gap = Math.max(0, target - st.emergency);
     // Keep one week of observed/planned variable living costs as a cash buffer.
     const week = Math.ceil(categories.filter(x => !x.fixed).reduce((n, x) => n + x.forecast, 0) / days * 7);
@@ -103,8 +119,8 @@
     const previousExpense = sum(st.all.filter(x => monthOf(x) === previousMonths[0] && x.entry_type === 'expense' && (mode !== 'current' || +date(x).slice(8, 10) <= elapsed)));
     const previousObserved = observedMonths.includes(previousMonths[0]);
     const top = [...categories].sort((a, b) => (b.spent - b.budget) - (a.spent - a.budget)).find(x => x.spent > x.budget);
-    const stage = mode === 'past' ? '月份回顧' : mode === 'future' ? '尚未開始' : st.unresolved ? '先核對卡片歸屬' : afterReserve < 0 ? '先補現金缺口' : gap > 0 ? '優先建立安全墊' : '可評估追加投資';
-    return { mode, stage, categories, remainingDays, remainingLiving, planned, forecast, cashBase, afterReserve, available, gap, emergency, core, flex,
+    const stage = mode === 'past' ? '月份回顧' : mode === 'future' ? '尚未開始' : st.unresolved ? '先核對卡片歸屬' : uncertain ? '先補帳單或刷卡預留' : afterReserve < 0 ? '先補現金缺口' : gap > 0 ? '優先建立安全墊' : '可評估追加投資';
+    return { mode, stage, categories, remainingDays, remainingLiving, necessaryReserve,unbilledReserve,uncertain, planned, forecast, cashBase, afterReserve, available, gap, emergency, core, flex,
       historyMonths:observedMonths.length, previousExpense:previousObserved ? previousExpense : null, expenseDelta:previousObserved ? st.monthExpense - previousExpense : null,
       dailyLimit:remainingDays > 0 ? Math.floor(Math.max(0, Math.min(planned - st.monthExpense, cashBase - st.cardDebt)) / remainingDays) : 0, top };
   }

@@ -139,7 +139,7 @@ window.MILLIONPROJECT_CARD_VERSION="cards-source-1";
       <div class="row3" style="margin-top:10px">
         <div class="field"><label>結帳日</label><input id="mpc-statement" type="number" min="1" max="31" value="${card?.statement_day||1}"></div>
         <div class="field"><label>繳款日（次月）</label><input id="mpc-due" type="number" min="1" max="31" value="${card?.due_day||1}"></div>
-        <div class="field"><label>單卡每月自訂上限（0＝不設）</label><input id="mpc-cap" type="number" min="0" value="${card?.monthly_spend_cap||0}"></div>
+        <div class="field"><label>每月刷卡預算／每期預留（0＝帳單模式依歷史估計）</label><input id="mpc-cap" type="number" min="0" value="${card?.monthly_spend_cap||0}"></div>
       </div>
       <div class="field" style="margin-top:10px"><label>卡片狀態</label><select id="mpc-status"><option value="active" ${card?.status!=='inactive'?'selected':''}>啟用</option><option value="inactive" ${card?.status==='inactive'?'selected':''}>停用／已剪卡</option></select></div>
       <div class="status-note" style="margin-top:10px"><b>額度 ≠ 預算。</b><div class="tiny">信用額度只影響銀行還讓你刷多少；系統仍會用生活預算計算全卡共用的「安全可刷池」。停用卡會保留歷史與待繳帳單，但不再出現在新增刷卡選單。</div></div>
@@ -193,6 +193,8 @@ window.MILLIONPROJECT_CARD_VERSION="cards-source-1";
       if(e1)throw e1;
       const {data:payments,error:e2}=await c.from('credit_card_payments').select('id,issuer,credit_card_id').eq('user_id',u.id);
       if(e2)throw e2;
+      const statements=await readMoneyTable('credit_card_statements','cycle_end');
+      if(statements.some(s=>String(s.credit_card_id)===String(id)))return alert('這張卡已有帳單歷史，請改為停用以保留紀錄。');
       if((spends||[]).some(x=>model.couldMatchRecord(x,card,cards))||(payments||[]).some(x=>model.couldMatchRecord(x,card,cards,'issuer'))){
         return alert('這張卡已有刷卡或繳款歷史，為避免帳單紀錄斷鏈，不能直接刪除。請把卡片狀態改成「停用／已剪卡」，系統會保留歷史但不再允許新增刷卡。');
       }
@@ -205,15 +207,15 @@ window.MILLIONPROJECT_CARD_VERSION="cards-source-1";
   window.mpCreditCards=async()=>{
     const app=document.getElementById('app');if(!app)return;
     try{
-      const [cards,allEntries,pays]=await Promise.all([readMoneyTable('credit_cards','created_at'),readMoneyTable('finance_entries','entry_date'),readMoneyTable('credit_card_payments','payment_date')]);
+      const [cards,allEntries,pays,statements]=await Promise.all([readMoneyTable('credit_cards','created_at'),readMoneyTable('finance_entries','entry_date'),readMoneyTable('credit_card_payments','payment_date'),readMoneyTable('credit_card_statements','cycle_end')]);
       const today=new Date(),month=model.today(today).slice(0,7);
-      const finance=MPFinanceModel.ledger({month,entries:allEntries,payments:pays,cards});
+      const finance=MPFinanceModel.ledger({month,entries:allEntries,payments:pays,cards,statements});
       const entries=finance.all.filter(x=>x.entry_type==='expense');
       const ambiguous=finance.unresolved;
       const balances=finance.bills;
       const monthExpense=entries.filter(x=>String(x.month||'').slice(0,7)===month).reduce((s,x)=>s+(+x.amount||0),0);
       const life=typeof plannedLivingTotal==='function'?plannedLivingTotal():0;
-      const safePool=finance.unresolved?0:Math.max(0,Math.min(life-monthExpense,finance.liquidCash-finance.cardDebt));
+      const safePool=finance.unresolved||finance.statementReserve?.uncertain?0:Math.max(0,Math.min(life-monthExpense,finance.liquidCash-finance.cardDebt));
 
       const rows=cards.map(card=>{
         const issuer=card.issuer,sd=+card.statement_day||1,dd=+card.due_day||1,limit=+card.credit_limit||0;
@@ -229,14 +231,14 @@ window.MILLIONPROJECT_CARD_VERSION="cards-source-1";
         const inactive=card.status==='inactive';
         const safe=inactive?0:Math.min(avail,safePool,capRemain);
         const late=pending.some(x=>x.overdue);
-        const badge=inactive?(out>0?'已停用・待繳':'已停用'):(late?'逾期待繳':out>0?'待繳':'正常');
+        const badge=inactive?(out>0?'已停用・待繳':'已停用'):(late?'已到期・待確認':out>0?'待繳':'正常');
         const badgeClass=late?'no':(out>0||inactive)?'watch':'buy';
         return `<div class="card">
           <div class="split"><div><div class="section-kicker">${escx(String(issuer).toUpperCase())}</div><h3 style="margin:3px 0">${escx(card.card_name||issuer+'信用卡')}</h3></div><span class="pill ${badgeClass}">${badge}</span></div>
           <div class="advice-list">
             <div class="advice-item"><span>本期未出帳</span><b>${moneyx(current)}</b></div>
             <div class="advice-item"><span>各期已出帳待繳</span><b>${moneyx(out)}</b></div>
-            <div class="advice-item"><span>目前可用實體額度</span><b>${moneyx(avail)}</b></div>
+            <div class="advice-item"><span>可用額度估計（非銀行即時）</span><b>${moneyx(avail)}</b></div>
             <div class="advice-item"><span>下一筆刷這張卡，建議最多</span><b>${moneyx(safe)}</b></div>
           </div>
           <div class="tiny" style="margin-top:9px">結帳 ${sd} 日 · 下一期 ${ymd(nextDue)} 繳款 · 額度 ${moneyx(limit)}${softCap>0?' · 自訂月上限 '+moneyx(softCap):''}</div>
@@ -255,14 +257,15 @@ window.MILLIONPROJECT_CARD_VERSION="cards-source-1";
       }).join('');
 
       app.innerHTML=`<section class="card">
-        <div class="split"><div><div class="section-kicker">CREDIT CARD CONTROL</div><h2 style="margin:4px 0">信用卡帳單週期</h2><div class="tiny">刷卡當天算支出；隔月繳卡費只結清帳單，不重複算第二次支出。</div></div><button class="btn main" onclick="mpCardSettings(null)">＋ 新增信用卡</button></div>
+        <div class="split"><div><div class="section-kicker">CREDIT CARD CONTROL</div><h2 style="margin:4px 0">信用卡帳單與繳款</h2><div class="tiny">帳單登錄一次，扣款再確認一次；逐筆記帳可選用，已核對帳單不與明細重複加總。</div></div><button class="btn main" onclick="mpCardSettings(null)">＋ 新增信用卡</button></div>
         <div class="status-note" style="margin-top:10px"><b>全卡共用安全可刷池：${moneyx(safePool)}</b><div class="tiny">這是一個共用池，不是每張卡各有 ${moneyx(safePool)}。銀行額度再高，也不會提高你的生活預算。</div></div>
       </section>
       ${mpCashFlowHtml(finance)}
+      ${mpStatementPanel(finance)}
       ${ambiguous?`<section class="card" role="status" style="margin-top:14px">有 ${ambiguous} 筆舊紀錄的卡片名稱重複，尚未分配到個別帳單。請確認原刷卡或繳款紀錄；目前單卡可用額度可能高估。</section>`:''}
       <section class="grid g3" style="margin-top:14px">${rows||'<div class="card"><div class="empty">尚未建立信用卡</div></div>'}</section>
-      <section class="card" style="margin-top:14px">
-        <div class="section-kicker">NEW CARD SPEND</div><h3>記一筆刷卡</h3>
+      <section class="card" style="margin-top:14px"><details>
+        <summary>選用：記一筆刷卡</summary><div class="tiny">已登錄帳單的期別以帳單為準；補記明細不會再次增加該期消費。</div>
         <div class="entry-form">
           <div class="field"><label>日期</label><input id="mpcc-date" type="date" value="${model.today(today)}"></div>
           <div class="field"><label>卡片</label><select id="mpcc-card">${activeCards.map(x=>`<option value="${escx(model.token(x))}">${escx(x.issuer+' · '+(x.card_name||'信用卡'))}</option>`).join('')}</select></div>
@@ -271,7 +274,7 @@ window.MILLIONPROJECT_CARD_VERSION="cards-source-1";
           <div class="field"><label>備註</label><input id="mpcc-note"></div>
           <button class="btn main" onclick="mpAddCardSpend()" ${activeCards.length?'':'disabled'}>${activeCards.length?'新增刷卡':'沒有啟用中的卡片'}</button>
         </div>
-      </section>
+      </details></section>
       <section class="card" style="margin-top:14px">
         <div class="section-title"><div><div class="section-kicker">PAYMENT HISTORY</div><h3>卡費繳款紀錄</h3><div class="tiny">依實際扣款日連動每月現金支出與資金餘額。可編輯或刪除；不重複計入消費。</div></div></div>
         <div class="mp-payment-list">${paymentRows||'<div class="empty">尚無繳款紀錄</div>'}</div>

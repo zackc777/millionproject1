@@ -68,7 +68,7 @@ test('繳款日當天不標逾期；隔天才標示',async()=>{
     const h=harness(time);h.db.credit_cards=[card()];
     h.db.finance_entries=[{user_id:'test-user',entry_type:'expense',entry_date:'2026-09-17',month:'2026-09-01',amount:300,payment_method:'台新'}];
     h.load('src/runtime/cards.js');await h.ctx.mpCreditCards();
-    assert.equal(h.app.innerHTML.includes('逾期待繳'),late);
+    assert.equal(h.app.innerHTML.includes('已到期・待確認'),late);
   }
 });
 test('讀不到繳款資料時顯示錯誤，避免顯示未扣款的錯誤帳單',async()=>{
