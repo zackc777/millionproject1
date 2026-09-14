@@ -76,3 +76,29 @@ test('改卡片結帳日不改已對帳期間；原明細不重複出現',()=>{
   const s=statement({cycle_start:'2026-07-18'});const st=run({statements:[s],entries:[income,spend],cards:[{...card(),statement_day:1}]});
   assert.equal(st.totalExpense,8500);assert.equal(st.cardDebt,8500);assert.equal(st.bills.find(b=>b.statementId==='s1').dueDate,'2026-09-02');
 });
+test('每月卡費增加時先縮減追加配置；繳款後不再扣第二次',()=>{
+  const h=harness(),entries=[{...income,entry_date:'2026-09-01',month:'2026-09-01'}];
+  const profile={rent:10000,daily:6000,__fixed:{rent:true,daily:false}};
+  const plan=(total,payments=[])=>h.ctx.MPFinanceModel.rolling(run({entries,payments,cards:[{...card(),monthly_spend_cap:5000}],statements:[statement({total})],today:'2026-09-10'}),profile,70000,'2026-09-10');
+  const low=plan(8000),high=plan(12000),paid=plan(12000,[payment({amount:12000})]);
+  assert.equal(low.available-high.available,4000);
+  assert.equal(high.available,paid.available);assert.equal(high.spendingAvailable,paid.spendingAvailable);
+  assert.equal(high.core,0);assert.equal(high.emergency+high.flex,high.available);
+});
+test('日常可花先保留房租，卡費暴增時日限額下降且停止追加存投',()=>{
+  const h=harness(),profile={rent:10000,daily:6000,__fixed:{rent:true,daily:false}};
+  const entries=[{...income,amount:20000,entry_date:'2026-09-01',month:'2026-09-01'}];
+  const st=run({entries,cards:[{...card(),monthly_spend_cap:5000}],statements:[statement({total:8000})],today:'2026-09-10'});
+  const p=h.ctx.MPFinanceModel.rolling(st,profile,70000,'2026-09-10');
+  assert.equal(p.spendingAvailable,2000);assert.equal(p.dailyLimit,100);assert.equal(p.afterReserve,-4000);
+  assert.equal(p.available,0);assert.equal(p.emergency,0);assert.equal(p.core,0);
+  const missing=h.ctx.MPFinanceModel.rolling(run({entries}),profile,70000,'2026-09-18');
+  assert.equal(missing.spendingAvailable,0);assert.equal(missing.dailyLimit,0);
+});
+test('信用卡安全可刷池與每月財務共用日常可用金額',async()=>{
+  const h=harness('2026-09-10T04:00:00Z');h.db.credit_cards=[{...card(),monthly_spend_cap:5000}];
+  h.db.finance_entries=[{...income,amount:20000,entry_date:'2026-09-01',month:'2026-09-01'}];h.db.credit_card_statements=[statement({total:8000})];
+  h.ctx.getBudgetProfile=()=>({rent:10000,daily:6000,__fixed:{rent:true,daily:false}});h.ctx.plannedLivingTotal=()=>16000;
+  h.load('src/runtime/cards.js');await h.ctx.mpCreditCards();
+  assert.match(h.app.innerHTML,/全卡共用安全可刷池：NT\$2,000/);
+});

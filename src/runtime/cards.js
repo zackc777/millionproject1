@@ -215,7 +215,9 @@ window.MILLIONPROJECT_CARD_VERSION="cards-source-1";
       const balances=finance.bills;
       const monthExpense=entries.filter(x=>String(x.month||'').slice(0,7)===month).reduce((s,x)=>s+(+x.amount||0),0);
       const life=typeof plannedLivingTotal==='function'?plannedLivingTotal():0;
-      const safePool=finance.unresolved||finance.statementReserve?.uncertain?0:Math.max(0,Math.min(life-monthExpense,finance.liquidCash-finance.cardDebt));
+      const budget=typeof getBudgetProfile==='function'?getBudgetProfile():{daily:life,__fixed:{daily:false}};
+      const allocation=MPFinanceModel.rolling(finance,budget,typeof getEmergencyGoalCached==='function'?getEmergencyGoalCached():70000);
+      const safePool=allocation.spendingAvailable;
 
       const rows=cards.map(card=>{
         const issuer=card.issuer,sd=+card.statement_day||1,dd=+card.due_day||1,limit=+card.credit_limit||0;

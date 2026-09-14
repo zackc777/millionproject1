@@ -110,6 +110,12 @@
     const uncertain=!!st.statementReserve?.uncertain;
     const afterReserve = cashBase - st.cardDebt - necessaryReserve;
     const available = mode === 'current' && !st.unresolved && !uncertain ? Math.max(0, Math.floor(afterReserve)) : 0;
+    const fixedRemaining = categories.filter(x => x.fixed).reduce((n, x) => n + x.remaining, 0);
+    const variableRemaining = categories.filter(x => !x.fixed).reduce((n, x) => n + x.remaining, 0);
+    // Everyday spending must not consume unpaid fixed bills or any extra card reserve.
+    const extraCardReserve = Math.max(0, necessaryReserve - remainingLiving);
+    const spendingAvailable = mode === 'current' && !st.unresolved && !uncertain ? Math.floor(Math.max(0,
+      Math.min(variableRemaining, cashBase - st.cardDebt - fixedRemaining - extraCardReserve))) : 0;
     const gap = Math.max(0, target - st.emergency);
     // Keep one week of observed/planned variable living costs as a cash buffer.
     const week = Math.ceil(categories.filter(x => !x.fixed).reduce((n, x) => n + x.forecast, 0) / days * 7);
@@ -120,9 +126,9 @@
     const previousObserved = observedMonths.includes(previousMonths[0]);
     const top = [...categories].sort((a, b) => (b.spent - b.budget) - (a.spent - a.budget)).find(x => x.spent > x.budget);
     const stage = mode === 'past' ? '月份回顧' : mode === 'future' ? '尚未開始' : st.unresolved ? '先核對卡片歸屬' : uncertain ? '先補帳單或刷卡預留' : afterReserve < 0 ? '先補現金缺口' : gap > 0 ? '優先建立安全墊' : '可評估追加投資';
-    return { mode, stage, categories, remainingDays, remainingLiving, necessaryReserve,unbilledReserve,uncertain, planned, forecast, cashBase, afterReserve, available, gap, emergency, core, flex,
+    return { mode, stage, categories, remainingDays, remainingLiving, necessaryReserve,unbilledReserve,uncertain, fixedRemaining, spendingAvailable, planned, forecast, cashBase, afterReserve, available, gap, emergency, core, flex,
       historyMonths:observedMonths.length, previousExpense:previousObserved ? previousExpense : null, expenseDelta:previousObserved ? st.monthExpense - previousExpense : null,
-      dailyLimit:remainingDays > 0 ? Math.floor(Math.max(0, Math.min(planned - st.monthExpense, cashBase - st.cardDebt)) / remainingDays) : 0, top };
+      dailyLimit:remainingDays > 0 ? Math.floor(spendingAvailable / remainingDays) : 0, top };
   }
   root.MPFinanceModel = Object.freeze({ ledger, rolling, isCard, cardBalances, categoryKey, monthOf });
 })(typeof window !== 'undefined' ? window : globalThis);

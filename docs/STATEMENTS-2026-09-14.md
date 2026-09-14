@@ -25,7 +25,7 @@
 
 ## 已驗證與未驗證
 
-- 48 項 Node 測試通過；15 個固定同源 JS build 成功，HTML/SRI/manifest 一致。
+- 51 項 Node 測試通過；15 個固定同源 JS build 成功，HTML/SRI/manifest 一致。
 - 回歸涵蓋原信用卡、投資分流、導覽來源、財務與重複渲染修正；新測試涵蓋對帳替換、跨月、carryover、初始欠款、部分付款、分類、卡片日變更、revision CAS、重複送出與失敗保留。
 - `supabase/tests/card_statements.sql` 已在正式 DB 使用隨機測試身分／卡片執行，交易最後 ROLLBACK；驗證 ownership、CRUD、重疊／重複、revision、分類與有繳款不能刪除。沒有保留測試帳號或交易。
 - Supabase advisors：新增資料表／函式無安全警告。新增索引有尚未使用的 INFO，保留以支持外鍵。既有 set_updated_at search_path、密碼保護及其他表 RLS／索引建議未在本批擴大修改。參考：https://supabase.com/docs/guides/database/database-linter
@@ -33,6 +33,10 @@
 - 前端仍待 Preview 及正式 endpoint 驗證。正式網站尚未切到帳單模式。新表為加法變更，空表不影響目前正式版本。
 
 ## 發布順序與回退
+
+最新補強：卡費增加先降低追加配置；繳清已預留帳單後，不重複縮減可配置金額。日常可用金額先扣待繳卡債、未付固定生活費與超出生活預算的未出帳預留，再限制於剩餘變動生活預算。每日上限與信用卡全卡共用可刷池採相同計算。現金不足時追加存款／投資為零，顯示缺口；帳單或預留資料不足時，日常可用顯示待核對。新增三項回歸案例驗證上述規則，不新增另一份使用者金流紀錄。
+
+PR #4：https://github.com/zackc777/millionproject1/pull/4。Vercel 預覽曾回報 Ready，但重新讀取 deployment 明確回覆 403：Not authorized under scope z9000282-8151。尚未完成候選頁桌機／手機驗收，未合併 main。
 
 資料庫 migration 已套用並驗證。不可重播 supabase/history。前端先核對 preview HTML、release.json、15 個 JS 與候選 SHA，完成桌機／手機驗收後才合併 main；再執行 scripts/verify-release.mjs。
 
