@@ -158,16 +158,16 @@ async function readMoneyTable(table,order){
 }
 async function moneyEngine(targetMonth){
   const month=monthKey(targetMonth)||MPCardModel.today().slice(0,7);
-  const [entries,payments,cards,holdings,statements]=await Promise.all([
+  const [entries,payments,cards,holdings,statements,reconciliations]=await Promise.all([
     readMoneyTable('finance_entries','entry_date'),readMoneyTable('credit_card_payments','payment_date'),
-    readMoneyTable('credit_cards','created_at'),readMoneyTable('portfolio','updated_at'),readMoneyTable('credit_card_statements','cycle_end')
+    readMoneyTable('credit_cards','created_at'),readMoneyTable('portfolio','updated_at'),readMoneyTable('credit_card_statements','cycle_end'),readMoneyTable('cash_reconciliations','balance_date')
   ]);
-  const st=MPFinanceModel.ledger({month,entries,payments,cards,statements});
+  const st=MPFinanceModel.ledger({month,entries,payments,cards,statements,reconciliations});
   const portfolioCost=holdings.reduce((n,x)=>n+(+x.quantity||0)*(+x.avg_cost||0),0);
   const portfolioValue=holdings.reduce((n,x)=>n+(+x.current_value||((+x.quantity||0)*(+x.current_price||0))||((+x.quantity||0)*(+x.avg_cost||0))),0);
   const untrackedInvestment=Math.max(0,st.totalInvestment-portfolioCost);
   const investmentValue=portfolioValue+untrackedInvestment;
-  return {...st,portfolioCost,portfolioValue,untrackedInvestment,investmentValue,totalAssets:st.cashLike+investmentValue-st.cardDebt};
+  return {...st,reconciliations,portfolioCost,portfolioValue,untrackedInvestment,investmentValue,totalAssets:st.cashLike+investmentValue-st.cardDebt};
 }
 async function persistMonthSnapshot(month,state){
   if(!u||!c)return false;
@@ -310,7 +310,8 @@ async function monthly(){
   </div>
   <div class="card hero" style="margin-top:12px;padding:16px"><div class="split"><div><div class="eyebrow">SYSTEM TOTAL ASSETS</div><div class="v">${money(state.totalAssets)}</div><div class="tiny" style="color:#cbd5e1">可用現金＋緊急預備金＋其他存款＋投資資產</div></div><button class="btn ghost" onclick="saveMonth()">儲存本月快照</button></div></div>
   ${state.liquidCash<0?`<div class="status-note" style="margin-top:10px;border-color:#fecaca;background:#fff1f2"><b class="danger">⚠️ 帳面可用現金為負。</b> 這通常代表你有「系統開始前的既有資產」尚未建立起始餘額，或某筆收入／轉帳尚未記錄。不要用手動改總資產掩蓋它，應先補齊來源。</div>`:''}
-  <input id="m" type="hidden" value="${selected}"><input id="inc" type="hidden" value="${inc||0}"><input id="exp" type="hidden" value="${exp||0}"><input id="buy" type="hidden" value="${ledgerInvestment||0}"><input id="ef_balance" type="hidden" value="${emergency||0}">
+  ${mpCashReconciliationPanel(state)}
+    <input id="m" type="hidden" value="${selected}"><input id="inc" type="hidden" value="${inc||0}"><input id="exp" type="hidden" value="${exp||0}"><input id="buy" type="hidden" value="${ledgerInvestment||0}"><input id="ef_balance" type="hidden" value="${emergency||0}">
   <div class="scroll" style="margin-top:14px"><table class="table"><tr><th>月份</th><th>收入</th><th>支出</th><th>現金＋存款</th><th>緊急預備金</th><th>投資市值</th><th>當月投資</th><th>總資產</th></tr>${a.map(z=>`<tr><td>${esc((z.month||'').slice(0,7))}</td><td>${money(z.income)}</td><td>${money(z.expense)}</td><td>${money(z.cash_savings)}</td><td>${money(z.emergency_fund)}</td><td>${money((+z.total_assets||0)-(+z.cash_savings||0))}</td><td>${money(z.etf_contribution)}</td><td><b>${money(z.total_assets)}</b></td></tr>`).join('')||'<tr><td colspan="8" class="empty">尚無資料</td></tr>'}</table></div>
  </section>`;
  refreshEntryCategories();renderEntryTable(entries);previewAllocation();
@@ -747,14 +748,13 @@ function emergencyPanelHtml(st,target){
   </section>`;
 }
 async function overview(){
-  await loadEmergencyGoal();
-  let d=await q('investment_decisions',{order:'decision_date'}),t=await q('tasks',{order:'created_at'}),r=await q('research_assets',{order:'updated_at'});
   const activeMonth=MPCardModel.today().slice(0,7);
-  let st=await moneyEngine(activeMonth),target=getGoal(),eTarget=getEmergencyGoalCached(),goal=Math.min(100,Math.max(0,st.totalAssets)/target*100),sr=st.monthIncome?((st.monthSaving+st.monthInvestment)/st.monthIncome*100):0,ir=st.monthIncome?(st.monthInvestment/st.monthIncome*100):0,ep=Math.min(100,Math.max(0,st.emergency)/eTarget*100),done=t.filter(z=>z.status==='done').length,eGap=Math.max(0,eTarget-st.emergency);
+  const [d,t,r,st]=await Promise.all([q('investment_decisions',{order:'decision_date'}),q('tasks',{order:'created_at'}),q('research_assets',{order:'updated_at'}),moneyEngine(activeMonth),loadEmergencyGoal()]);
+  const target=getGoal(),eTarget=getEmergencyGoalCached(),goal=Math.min(100,Math.max(0,st.totalAssets)/target*100),sr=st.monthIncome?((st.monthSaving+st.monthInvestment)/st.monthIncome*100):0,ir=st.monthIncome?(st.monthInvestment/st.monthIncome*100):0,ep=Math.min(100,Math.max(0,st.emergency)/eTarget*100),done=t.filter(z=>z.status==='done').length,eGap=Math.max(0,eTarget-st.emergency);
   const plan=MPFinanceModel.rolling(st,getBudgetProfile(),eTarget),strategy=plan.afterReserve<0?`本月資金預留缺口 ${money(-plan.afterReserve)}，先核對帳單與生活責任。`:`${plan.stage}：生活還需預留 ${money(plan.remainingLiving)}、待繳卡費 ${money(st.cardDebt)}，剩餘可追加 ${money(plan.available)}。`;
-  $('app').innerHTML=`<section class="grid g4"><div class="card hero" style="grid-column:span 2"><div class="eyebrow">MILLION PROJECT / LIVE MONEY ENGINE</div><div class="split" style="margin-top:7px"><div><div class="big">${money(st.totalAssets)}</div><div style="color:#cbd5e1">系統即時計算淨資產</div></div><span class="pill" style="background:#ffffff14;color:#fff;border-color:#ffffff24">${goal.toFixed(1)}%</span></div><div class="bar" style="margin-top:14px;background:#334155"><i style="width:${goal}%"></i></div><div class="split tiny" style="color:#cbd5e1;margin-top:5px"><span>資產目標 ${money(target)}</span><span>差額 ${money(Math.max(0,target-st.totalAssets))}</span></div></div><div class="metric"><div class="label">本月儲蓄＋投資率</div><div class="num">${st.monthIncome?sr.toFixed(1)+'%':'—'}</div><div class="tiny">（存款＋投資）／收入</div></div><div class="metric"><div class="label">本月投資率</div><div class="num">${st.monthIncome?ir.toFixed(1)+'%':'—'}</div><div class="tiny">實際投資／收入</div></div></section>
+  $('app').innerHTML=`<section class="grid g4"><div class="card hero" style="grid-column:span 2"><div class="eyebrow">MILLION PROJECT / LIVE MONEY ENGINE</div><div class="split" style="margin-top:7px"><div><div class="big">${money(st.totalAssets)}</div><div style="color:#cbd5e1">依金流／對帳推估淨資產</div></div><span class="pill" style="background:#ffffff14;color:#fff;border-color:#ffffff24">${goal.toFixed(1)}%</span></div><div class="bar" style="margin-top:14px;background:#334155"><i style="width:${goal}%"></i></div><div class="split tiny" style="color:#cbd5e1;margin-top:5px"><span>資產目標 ${money(target)}</span><span>差額 ${money(Math.max(0,target-st.totalAssets))}</span></div></div><div class="metric"><div class="label">本月儲蓄＋投資率</div><div class="num">${st.monthIncome?sr.toFixed(1)+'%':'—'}</div><div class="tiny">（存款＋投資）／收入</div></div><div class="metric"><div class="label">本月投資率</div><div class="num">${st.monthIncome?ir.toFixed(1)+'%':'—'}</div><div class="tiny">實際投資／收入</div></div></section>
   <section class="grid g2" style="margin-top:14px"><div class="card emergency-panel"><div class="split"><div><div class="section-kicker">EMERGENCY FUND</div><h3 style="margin:3px 0">🏦 緊急預備金</h3></div><button class="btn ghost" onclick="setEmergencyTarget()">修改目標</button></div><div class="split" style="margin-top:10px"><div><div class="emergency-number">${money(st.emergency)}</div><div class="tiny">目前累積／目標 ${money(eTarget)}</div></div><div style="text-align:right"><b>${ep.toFixed(1)}%</b><div class="tiny">還差 ${money(eGap)}</div></div></div><div class="emergency-track"><i style="width:${ep}%"></i></div></div><div class="card"><div class="section-kicker">${activeMonth} MONEY FLOW</div><h3>本月收入去哪裡了</h3>${flowVisualHtml(st)}<div class="money-status"><div class="box"><div class="k">收入</div><div class="n">${money(st.monthIncome)}</div></div><div class="box"><div class="k">支出</div><div class="n">${money(st.monthExpense)}</div></div><div class="box"><div class="k">已存</div><div class="n">${money(st.monthSaving)}</div></div><div class="box"><div class="k">已投資</div><div class="n">${money(st.monthInvestment)}</div></div><div class="box"><div class="k">本月資金餘額</div><div class="n">${money(Math.max(0,st.monthUnallocated))}</div></div></div></div></section>
-  ${mpCashFlowHtml(st)}<section class="grid g3" style="margin-top:14px"><div class="card"><div class="k">資產結構</div><div class="advice-list"><div class="advice-item"><span>可用現金</span><b>${money(st.liquidCash)}</b></div><div class="advice-item"><span>緊急預備金</span><b>${money(st.emergency)}</b></div><div class="advice-item"><span>其他存款</span><b>${money(st.otherSaving)}</b></div><div class="advice-item"><span>投資資產</span><b>${money(st.investmentValue)}</b></div></div></div><div class="card"><div class="k">本月建議</div><div class="recommend"><b>${esc(strategy)}</b><div class="tiny" style="margin-top:5px">所有數字直接讀取實際金流，不需要月底重填。</div></div></div><div class="card"><div class="k">研究系統</div><div class="split" style="margin-top:9px"><span class="pill">研究 ${r.length}</span><span class="pill">決策 ${d.length}</span><span class="pill">任務 ${done}/${t.length}</span></div></div></section>`;
+  ${mpCashFlowHtml(st)}<section class="grid g3" style="margin-top:14px"><div class="card"><div class="k">資產結構</div><div class="advice-list"><div class="advice-item"><span>可用現金</span><b>${money(st.liquidCash)}</b></div><div class="advice-item"><span>緊急預備金</span><b>${money(st.emergency)}</b></div><div class="advice-item"><span>其他存款</span><b>${money(st.otherSaving)}</b></div><div class="advice-item"><span>投資資產</span><b>${money(st.investmentValue)}</b></div></div></div><div class="card"><div class="k">本月建議</div><div class="recommend"><b>${esc(strategy)}</b><div class="tiny" style="margin-top:5px">以金流及最近對帳餘額推估；漏記時請核對實際現金。</div></div></div><div class="card"><div class="k">研究系統</div><div class="split" style="margin-top:9px"><span class="pill">研究 ${r.length}</span><span class="pill">決策 ${d.length}</span><span class="pill">任務 ${done}/${t.length}</span></div></div></section>`;
 }
 async function monthly(){
   await loadEmergencyGoal();
@@ -769,7 +769,8 @@ async function monthly(){
   <div class="card"><div class="section-title"><div><div class="section-kicker">THIS MONTH · LIVE</div><h3>本月實際進度</h3></div><span class="live-badge">新增即更新</span></div>${flowVisualHtml(state)}<div style="margin-top:10px">${progressRow('已支出',expense,incomeBase,'#f97316')}${progressRow('預備金',p.emergency,incomeBase,'#10b981')}${progressRow('其他存款',p.otherSaving,incomeBase,'#14b8a6')}${progressRow('已投資',investment,incomeBase,'#6366f1')}${progressRow('待配置',unalloc,incomeBase,'#94a3b8')}</div></div></section>
   ${emergencyPanelHtml(state,eTarget)}
   <section class="card" id="ledgerBox" style="margin-top:14px;${salary>0?'':'opacity:.5;pointer-events:none'}"><div class="section-title"><div><div class="section-kicker">STEP 4 · ACTUAL LEDGER</div><h3>④ 只記真正發生的金流</h3><div class="tiny">新增、修改或刪除後，上面的色條、預備金、首頁與資產會一起重算。</div></div><span class="pill">${selected}</span></div><div class="entry-form"><div class="field"><label>日期</label><input id="ed" type="date" value="${selected}-01"></div><div class="field"><label>這筆是</label><select id="et" onchange="refreshEntryCategories()"><option value="expense">支出</option><option value="income">其他收入</option><option value="saving">存款／留存</option><option value="investment">投資</option></select></div><div class="field"><label>用途</label><select id="ec"></select></div><div class="field"><label>金額</label><input id="ea" type="number" min="0" placeholder="0"></div><div class="field"><label>付款／來源</label><select id="epm"><option>銀行轉帳／現金</option><option>台新</option><option>富邦</option><option>國泰</option><option>證券交割</option><option>其他</option></select></div><button class="btn main" onclick="addFinanceEntry()">＋ 新增</button></div><div class="field" style="margin-top:9px"><label>備註（可省略）</label><input id="en" placeholder="例如：房租、超市、0050 定期定額"></div><div id="entrySummary" style="margin-top:14px"></div><div class="scroll" style="margin-top:8px"><table class="entry-table"><thead><tr><th>日期</th><th>類型</th><th>用途</th><th>金額</th><th>付款方式</th><th>備註</th><th>操作</th></tr></thead><tbody id="entryRows"></tbody></table></div></section>
-  <section class="card" style="margin-top:14px;${salary>0?'':'opacity:.5;pointer-events:none'}"><div class="section-title"><div><div class="section-kicker">STEP 5 · AUTO RECONCILIATION</div><h3>⑤ 資產不用再手動重打一遍</h3><div class="tiny">這裡全部由前面的金流與持倉自動計算。月底只需儲存快照。</div></div><span class="live-badge">單一資料來源</span></div><div class="finance-kpis"><div class="finance-kpi"><div class="label">可用現金</div><div class="num">${money(state.liquidCash)}</div></div><div class="finance-kpi"><div class="label">緊急預備金</div><div class="num">${money(state.emergency)}</div><div class="tiny">目標 ${money(eTarget)}</div></div><div class="finance-kpi"><div class="label">其他存款</div><div class="num">${money(state.otherSaving)}</div></div><div class="finance-kpi"><div class="label">投資資產</div><div class="num">${money(state.investmentValue)}</div></div></div><div class="card hero" style="margin-top:12px;padding:16px"><div class="split"><div><div class="eyebrow">SYSTEM TOTAL ASSETS</div><div class="v">${money(state.totalAssets)}</div><div class="tiny" style="color:#cbd5e1">可用現金＋預備金＋其他存款＋投資資產</div></div><button class="btn ghost" onclick="saveMonth()">儲存本月快照</button></div></div>${state.liquidCash<0?`<div class="status-note" style="margin-top:10px;border-color:#fecaca;background:#fff1f2"><b class="danger">⚠️ 可用現金為負。</b> 可能有系統啟用前的既有資產未建立起始餘額，或金流漏記。</div>`:''}<input id="m" type="hidden" value="${selected}"><input id="inc" type="hidden" value="${income||0}"><input id="exp" type="hidden" value="${expense||0}"><input id="buy" type="hidden" value="${investment||0}"><input id="ef_balance" type="hidden" value="${state.emergency||0}"><div class="scroll" style="margin-top:14px"><table class="table"><tr><th>月份</th><th>收入</th><th>支出</th><th>現金＋存款</th><th>緊急預備金</th><th>投資市值</th><th>當月投資</th><th>總資產</th></tr>${a.map(z=>`<tr><td>${esc((z.month||'').slice(0,7))}</td><td>${money(z.income)}</td><td>${money(z.expense)}</td><td>${money(z.cash_savings)}</td><td>${money(z.emergency_fund)}</td><td>${money((+z.total_assets||0)-(+z.cash_savings||0))}</td><td>${money(z.etf_contribution)}</td><td><b>${money(z.total_assets)}</b></td></tr>`).join('')||'<tr><td colspan="8" class="empty">尚無資料</td></tr>'}</table></div></section>`;
+  <section class="card" style="margin-top:14px;${salary>0?'':'opacity:.5;pointer-events:none'}"><div class="section-title"><div><div class="section-kicker">STEP 5 · AUTO RECONCILIATION</div><h3>⑤ 資產不用再手動重打一遍</h3><div class="tiny">這裡全部由前面的金流與持倉自動計算。月底只需儲存快照。</div></div><span class="live-badge">單一資料來源</span></div><div class="finance-kpis"><div class="finance-kpi"><div class="label">可用現金</div><div class="num">${money(state.liquidCash)}</div></div><div class="finance-kpi"><div class="label">緊急預備金</div><div class="num">${money(state.emergency)}</div><div class="tiny">目標 ${money(eTarget)}</div></div><div class="finance-kpi"><div class="label">其他存款</div><div class="num">${money(state.otherSaving)}</div></div><div class="finance-kpi"><div class="label">投資資產</div><div class="num">${money(state.investmentValue)}</div></div></div><div class="card hero" style="margin-top:12px;padding:16px"><div class="split"><div><div class="eyebrow">SYSTEM TOTAL ASSETS</div><div class="v">${money(state.totalAssets)}</div><div class="tiny" style="color:#cbd5e1">可用現金＋預備金＋其他存款＋投資資產</div></div><button class="btn ghost" onclick="saveMonth()">儲存本月快照</button></div></div>${state.liquidCash<0?`<div class="status-note" style="margin-top:10px;border-color:#fecaca;background:#fff1f2"><b class="danger">⚠️ 可用現金為負。</b> 可能有系統啟用前的既有資產未建立起始餘額，或金流漏記。</div>`:''}${mpCashReconciliationPanel(state)}
+    <input id="m" type="hidden" value="${selected}"><input id="inc" type="hidden" value="${income||0}"><input id="exp" type="hidden" value="${expense||0}"><input id="buy" type="hidden" value="${investment||0}"><input id="ef_balance" type="hidden" value="${state.emergency||0}"><div class="scroll" style="margin-top:14px"><table class="table"><tr><th>月份</th><th>收入</th><th>支出</th><th>現金＋存款</th><th>緊急預備金</th><th>投資市值</th><th>當月投資</th><th>總資產</th></tr>${a.map(z=>`<tr><td>${esc((z.month||'').slice(0,7))}</td><td>${money(z.income)}</td><td>${money(z.expense)}</td><td>${money(z.cash_savings)}</td><td>${money(z.emergency_fund)}</td><td>${money((+z.total_assets||0)-(+z.cash_savings||0))}</td><td>${money(z.etf_contribution)}</td><td><b>${money(z.total_assets)}</b></td></tr>`).join('')||'<tr><td colspan="8" class="empty">尚無資料</td></tr>'}</table></div></section>`;
   refreshEntryCategories();renderEntryTable(entries);
 }
 async function addFinanceEntry(){
@@ -899,15 +900,10 @@ function monthStatusText(m,stats,snap){
 }
 
 async function monthly(){
-  await loadEmergencyGoal();
-
   let selected=selectedMonth(); financeMonthCursor=selected;
   financeYearCursor=financeYearCursor||Number(selected.slice(0,4));
-
-  let snapshots=await q('monthly_finance',{order:'month'});
-  let snapshotMap={}; snapshots.forEach(x=>snapshotMap[monthKey(x.month)]=x);
-
-  let state=await moneyEngine(selected);
+  const [snapshots,state]=await Promise.all([q('monthly_finance',{order:'month'}),moneyEngine(selected),loadEmergencyGoal()]);
+  const snapshotMap={};snapshots.forEach(x=>snapshotMap[monthKey(x.month)]=x);
   let all=state.all;
   let entries=all.filter(z=>monthKey(z.month)===selected);
   let existing=snapshotMap[selected]||{};
@@ -961,11 +957,11 @@ async function monthly(){
   }).join('');
 
   const isPast=selected<systemFinanceMonth(),hasPastSnapshot=!!snapshotMap[selected];
-  const displayEmergency=isPast&&hasPastSnapshot?(+existing.emergency_fund||0):state.emergency;
-  const displayCashLike=isPast&&hasPastSnapshot?(+existing.cash_savings||0):state.cashLike;
+  const displayEmergency=state.emergency;
+  const displayCashLike=state.cashLike;
   const displayInvestment=isPast&&hasPastSnapshot?snapshotInvestmentValue(existing):state.investmentValue;
   const displayOtherCash=Math.max(0,displayCashLike-displayEmergency);
-  const displayTotal=isPast&&hasPastSnapshot?(+existing.total_assets||0):state.totalAssets;
+  const displayTotal=displayCashLike+displayInvestment-state.cardDebt;
 
   $('app').innerHTML=`
   <section class="card month-center">
@@ -1027,16 +1023,17 @@ async function monthly(){
   </section>
 
   <section class="card" style="margin-top:14px">
-    <div class="section-title"><div><div class="section-kicker">STEP 5 · ${isPast&&hasPastSnapshot?'HISTORICAL SNAPSHOT':'AUTO RECONCILIATION'}</div><h3>⑤ ${isPast&&hasPastSnapshot?'查看當月資產快照':'資產由前面自動結算'}</h3><div class="tiny">${isPast&&hasPastSnapshot?'過去月份優先顯示當時保存的快照，避免用今天的投資市值污染歷史。':'前面每一筆收入、支出、存款、投資都會直接進入資產引擎。'}</div></div>${isPast&&hasPastSnapshot?'<span class="month-snapshot-badge">📌 歷史快照</span>':'<span class="live-badge">單一資料來源</span>'}</div>
+    <div class="section-title"><div><div class="section-kicker">STEP 5 · ${isPast&&hasPastSnapshot?'HISTORICAL SNAPSHOT':'AUTO RECONCILIATION'}</div><h3>⑤ ${isPast&&hasPastSnapshot?'當月資產結算':'資產由前面自動結算'}</h3><div class="tiny">${isPast&&hasPastSnapshot?'現金依對帳與金流重算；投資保留當月快照市值。':'前面每一筆收入、支出、存款、投資都會直接進入資產引擎。'}</div></div>${isPast&&hasPastSnapshot?'<span class="month-snapshot-badge">📌 歷史快照</span>':'<span class="live-badge">單一資料來源</span>'}</div>
     <div class="finance-kpis">
       <div class="finance-kpi"><div class="label">${isPast&&hasPastSnapshot?'現金＋其他存款':'可用現金'}</div><div class="num">${money(isPast&&hasPastSnapshot?displayOtherCash:state.liquidCash)}</div></div>
       <div class="finance-kpi"><div class="label">緊急預備金</div><div class="num">${money(displayEmergency)}</div><div class="tiny">目標 ${money(eTarget)}</div></div>
       <div class="finance-kpi"><div class="label">${isPast&&hasPastSnapshot?'現金存款合計':'其他存款'}</div><div class="num">${money(isPast&&hasPastSnapshot?displayCashLike:state.otherSaving)}</div></div>
       <div class="finance-kpi"><div class="label">投資資產</div><div class="num">${money(displayInvestment)}</div></div>
     </div>
-    <div class="card hero" style="margin-top:12px;padding:16px"><div class="split"><div><div class="eyebrow">${isPast&&hasPastSnapshot?'MONTH-END SNAPSHOT':'SYSTEM TOTAL ASSETS'}</div><div class="v">${money(displayTotal)}</div><div class="tiny" style="color:#cbd5e1">${isPast&&hasPastSnapshot?'這是當月留存的資產快照':'淨資產＝現金＋存款＋投資資產 − 待繳卡費'}</div></div>${isPast&&hasPastSnapshot?'':`<button class="btn ghost" onclick="saveMonth()">儲存本月快照</button>`}</div></div>
+    <div class="card hero" style="margin-top:12px;padding:16px"><div class="split"><div><div class="eyebrow">${isPast&&hasPastSnapshot?'MONTH-END SNAPSHOT':'SYSTEM TOTAL ASSETS'}</div><div class="v">${money(displayTotal)}</div><div class="tiny" style="color:#cbd5e1">${isPast&&hasPastSnapshot?'現金依對帳重算，投資採當月快照':'淨資產＝現金＋存款＋投資資產 − 待繳卡費'}</div></div>${isPast&&hasPastSnapshot?'':`<button class="btn ghost" onclick="saveMonth()">儲存本月快照</button>`}</div></div>
     ${!isPast&&state.liquidCash<0?`<div class="status-note" style="margin-top:10px;border-color:#fecaca;background:#fff1f2"><b class="danger">⚠️ 可用現金為負。</b> 可能有系統啟用前的既有資產未建立起始餘額，或金流漏記。</div>`:''}
-    <div class="status-note" style="margin-top:10px">依截至 ${esc(state.asOf)} 的金流計算：現金 ${money(state.liquidCash)}，尚待繳卡費 ${money(state.cardDebt)}。${isPast&&hasPastSnapshot?'上方資產快照保留當時數值；後補金流不會改寫舊快照中的投資市值。':'現金與存款是資產，待繳卡費是負債。'}</div>
+    <div class="status-note" style="margin-top:10px">依截至 ${esc(state.asOf)} 的金流計算：現金 ${money(state.liquidCash)}，尚待繳卡費 ${money(state.cardDebt)}。${isPast&&hasPastSnapshot?'對帳與後補金流會重算現金；投資市值保留當月快照。':'現金與存款是資產，待繳卡費是負債。'}</div>
+    ${mpCashReconciliationPanel(state)}
     <input id="m" type="hidden" value="${selected}"><input id="inc" type="hidden" value="${income||0}"><input id="exp" type="hidden" value="${expense||0}"><input id="buy" type="hidden" value="${investment||0}"><input id="ef_balance" type="hidden" value="${state.emergency||0}">
   </section>
 

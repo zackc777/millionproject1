@@ -1,8 +1,8 @@
 function mpCashFlowHtml(st) {
-  return `<div class="finance-kpis mp-cash-summary">
+  return `<div class="status-note" style="margin:12px 0"><b>${st.reconciliation?'最後對帳 '+esc(st.reconciliation.balance_date):'現金尚未對帳'}</b> · ${st.reconciliation?'其後依已登錄金流推估；漏記時請再次核對。':'目前僅依記帳推估，請核對實際餘額。'} <button class="btn ghost" onclick="mpOpenCash()">核對現金</button>${st.monthCashAdjustment?`<div>本月未指定用途現金校正 ${money(st.monthCashAdjustment)}（不列收入或消費）。</div>`:''}</div><div class="finance-kpis mp-cash-summary">
     <div class="finance-kpi"><div class="label">本月現金支出／扣款</div><div class="num">${money(st.monthCashOut)}</div><div class="tiny">現金消費 ${money(st.monthCashExpense)} ＋ 繳卡費 ${money(st.monthCardPayments)}</div></div>
     <div class="finance-kpi"><div class="label">本月消費認列</div><div class="num">${money(st.monthExpense)}</div><div class="tiny">含信用卡 ${money(st.monthCardSpend)}；已對帳採結帳月份，其餘採消費日，付款不重複認列</div></div>
-    <div class="finance-kpi"><div class="label">本月資金餘額</div><div class="num">${money(st.monthUnallocated)}</div><div class="tiny">收入扣除現金扣款、存款與實際投資</div></div>
+    <div class="finance-kpi"><div class="label">本月資金餘額</div><div class="num">${money(st.monthUnallocated)}</div><div class="tiny">收入扣除現金扣款、存款與實際投資，再加對帳調整</div></div>
     <div class="finance-kpi"><div class="label">尚待繳卡費</div><div class="num">${money(st.cardDebt)}</div><div class="tiny">包含未出帳與以前月份未清餘額；先預留再配置</div></div>
   </div>${st.unmatchedPayments ? `<div class="status-note" style="margin-top:10px">有 ${money(st.unmatchedPayments)} 繳款超過系統中對應帳單的消費，可能是舊帳單、溢繳或漏記刷卡。現金已扣除，請核對原帳單；系統不會自動補成當月消費。</div>` : ''}${st.unresolved ? '<div class="status-note" role="status">有舊卡片紀錄尚無法唯一歸屬，追加配置暫停建議。請在原明細選擇正確卡片。</div>' : ''}`;
 }
@@ -20,10 +20,10 @@ function mpRollingAllocationHtml(st, plan) {
     ['投資上限',plan.core,'扣除必要預留後的上限，不代表必須全數投入','invest']
   ];
   return `<div class="mp-plan-head"><div><div class="section-kicker">ROLLING ALLOCATION · ${esc(st.month)}</div><h3>現在最該做什麼</h3></div><span class="pill">${esc(plan.stage)}</span></div>
-    <p class="muted">依截至 ${esc(st.asOf)} 的實際金流即時重算；只顯示接下來要保留或可安排的金額。</p>
+    <p class="muted">依截至 ${esc(st.asOf)} 的已記錄金流及對帳餘額推估；只顯示接下來要保留或可安排的金額；未記錄的花費仍會影響結果。</p>
     <div class="mp-plan-focus ${shortfall&&current?'warn':''}"><span>${focusLabel}</span><b>${focusValue}</b><small>${focusHint}</small></div>
     <div class="mp-plan-list">${steps.map(([label,value,hint,type],i)=>`<div class="mp-plan-row ${!value?'zero':''}"><i class="${type}">${i+1}</i><div><b>${esc(label)}</b><span>${esc(hint)}</span></div><strong>${money(value)}</strong></div>`).join('')}</div>
-    ${plan.uncertain?'<p class="status-note">缺最近一期帳單或未出帳估計依據。補登帳單或設定刷卡預留後才顯示追加配置；以下餘額尚未代表可以投資。</p>':''}
+    ${plan.uncertain?'<p class="status-note">現金尚未對帳、對帳已超過 31 天，或帳單／刷卡預留資料不足。請先核對，暫不建議追加投資。</p>':''}
     <div class="mp-plan-formula">可運用 ${money(plan.cashBase)} − 卡費 ${money(st.cardDebt)} − 生活／未出帳預留 ${money(plan.necessaryReserve??plan.remainingLiving)} = ${money(plan.afterReserve)}</div>`;
 }
 function mpSpendingReviewHtml(st, plan) {
