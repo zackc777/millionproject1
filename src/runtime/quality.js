@@ -54,9 +54,7 @@ window.MILLIONPROJECT_QUALITY_VERSION="quality-24";
         window.__mpBudgetProfile={...BUDGET_DEFAULT};
       }
       cloudBudgetUser=u.id;
-      if(before!==JSON.stringify(window.__mpBudgetProfile)){
-        setTimeout(()=>{try{if(typeof render==='function')render()}catch(_){}},0);
-      }
+
     }catch(e){console.warn('cloud budget load',e)}
     finally{cloudBudgetLoading=false}
   }
@@ -212,22 +210,14 @@ window.MILLIONPROJECT_QUALITY_VERSION="quality-24";
 
   async function afterRender(){
     fixMobileMore();
-    await loadCloudBudget();
-    await syncPaymentMethodOptions();
-    await refreshTaskPanel();
-    await bindLearningProgress();
+    await Promise.all([syncPaymentMethodOptions(),refreshTaskPanel(),bindLearningProgress()]);
   }
 
   const old=window.render;
   if(typeof old==='function'&&!old.__mpQuality24){
-    const w=async function(){const r=await old.apply(this,arguments);await afterRender();return r};
+    const w=async function(){await loadCloudBudget();const r=await old.apply(this,arguments);await afterRender();return r};
     w.__mpQuality24=true;window.render=w;try{render=w}catch(_){}
   }
 
-  let tries=0;
-  const timer=setInterval(async()=>{
-    tries++;
-    try{await loadCloudBudget();fixMobileMore();await syncPaymentMethodOptions()}catch(_){}
-    if(cloudBudgetUser||tries>12)clearInterval(timer);
-  },400);
+  // Budget is loaded before rendering; no polling or background full-page redraw.
 })();

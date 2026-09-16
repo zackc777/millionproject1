@@ -1,5 +1,7 @@
 # 維護交接
 
+> 2026-09-16：新增日終現金對帳、切頁保留最後點擊及減少重畫；基底 main 308a75d。詳見 docs/CASH-RECONCILIATION-2026-09-16.md。使用者明確要求不測試直接發布，本輪僅執行 build，不代表桌機或手機完整驗收。
+
 > 2026-09-14 發布完成：PR #4 已合併，正式 `main` 為 `bffb6cadc862f13d209e9436fe9f85249f9fad7d`。Vercel production status success；`scripts/verify-release.mjs` 已確認正式 HTML、release manifest 與 15 個固定同源模組均匹配此提交。候選版已完成登入後桌機流程驗收：帳單預覽不重複消費、繳卡費列入現金扣款、每月缺口與追加投資上限同步。台新實際卡片設定已校正為 17 日結帳、次月 2 日繳款。瀏覽器不提供手機 viewport 切換，因此手機實機仍由使用者上線後回饋。
 
 > 2026-09-14：正式 `main` 為 `626e367d7cbc1281db70784cae9f12f5e7976147`（PR #1–#3 已合併）。新的帳單模式在 `codex/card-statements`，尚未合併；新增帳單 table／RLS／guard 已套用，SQL 測試已回滾，未搬移既有使用者資料。完整規格與驗收缺口見 `docs/STATEMENTS-2026-09-14.md`。以下早期交接內容保留作歷史紀錄。

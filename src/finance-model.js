@@ -43,7 +43,7 @@
       closed:x.cycleEnd < asOf, overdue:!!x.dueDate && x.dueDate < asOf && x.spent > x.paid })).sort((a, b) => a.cycleEnd.localeCompare(b.cycleEnd));
     return { bills:rows, cardDebt:rows.reduce((n, x) => n + x.outstanding, 0), unmatchedPayments:rows.reduce((n, x) => n + x.unmatched, 0), unresolved };
   }
-  function ledger({ month, entries = [], payments = [], cards = [], statements = [], today = cardModel.today() }) {
+  function ledger({ month, entries = [], payments = [], cards = [], statements = [], reconciliations = [], today = cardModel.today() }) {
     cardModel.parts(month + '-01');
     const next = cardModel.shiftMonth(month + '-01', 1);
     const end = new Date(Date.parse(next + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
@@ -66,7 +66,25 @@
     st.liquidCash = st.totalIncome - st.totalCashOut - st.totalSaving - st.totalInvestment;
     st.emergency = sum(all.filter(x => x.entry_type === 'saving' && String(x.category).includes('緊急預備金')));
     st.otherSaving = st.totalSaving - st.emergency;
-    st.cashLike = st.liquidCash + st.totalSaving;
+    // A confirmed day-end balance is an absolute anchor, not another income/expense.
+    // Backfilled entries at/before that day change the discrepancy, never the anchor.
+    const observed = reconciliations.filter(x=>x.balance_date<=asOf).sort((a,b)=>a.balance_date.localeCompare(b.balance_date));
+    const offsets = row => {
+      if(!row)return {liquid:0,emergency:0,other:0};
+      const before=all.filter(x=>date(x)<=row.balance_date),t=totals(before);
+      const paid=sum(allPayments.filter(x=>String(x.payment_date).slice(0,10)<=row.balance_date));
+      const savedEmergency=sum(before.filter(x=>x.entry_type==='saving'&&String(x.category).includes('緊急預備金')));
+      return {liquid:Number(row.bank_total)+Number(row.wallet_total)-Number(row.emergency)-Number(row.other_saving)-(t.Income-t.CashExpense-paid-t.Saving-t.Investment),
+        emergency:Number(row.emergency)-savedEmergency,other:Number(row.other_saving)-(t.Saving-savedEmergency)};
+    };
+    st.reconciliation=observed.at(-1)||null;st.reconciliations=observed;
+    const offset=offsets(st.reconciliation),priorOffset=offsets(observed.filter(x=>x.balance_date<month+'-01').at(-1));
+    st.monthCashAdjustment=offset.liquid-priorOffset.liquid;
+    st.liquidCash+=offset.liquid;st.emergency+=offset.emergency;st.otherSaving+=offset.other;
+    st.monthUnallocated+=st.monthCashAdjustment;
+    st.cashLike = st.liquidCash + st.emergency + st.otherSaving;
+    st.cashAge=st.reconciliation?Math.max(0,Math.floor((Date.parse(asOf)-Date.parse(st.reconciliation.balance_date))/86400000)):null;
+    st.cashNeedsReview=st.cashAge===null||st.cashAge>31||st.emergency<0||st.otherSaving<0;
     Object.assign(st,statements.length?root.MPStatementModel.balances(all,allPayments,cards,statements,asOf):cardBalances(all,allPayments,cards,asOf));
     if(statements.length&&st.unresolved){
       const legacyEntries=all.filter(e=>!cards.some(c=>cardModel.matchesRecord(e,c,cards)));
@@ -107,7 +125,7 @@
     // Reserve the larger pool, not their sum; do not claim exact categorisation.
     const unbilledReserve=st.statementReserve?.total||0;
     const necessaryReserve=Math.max(remainingLiving,unbilledReserve);
-    const uncertain=!!st.statementReserve?.uncertain;
+    const uncertain=!!st.statementReserve?.uncertain||!!st.cashNeedsReview;
     const afterReserve = cashBase - st.cardDebt - necessaryReserve;
     const available = mode === 'current' && !st.unresolved && !uncertain ? Math.max(0, Math.floor(afterReserve)) : 0;
     const fixedRemaining = categories.filter(x => x.fixed).reduce((n, x) => n + x.remaining, 0);
@@ -125,7 +143,7 @@
     const previousExpense = sum(st.all.filter(x => monthOf(x) === previousMonths[0] && x.entry_type === 'expense' && (mode !== 'current' || +date(x).slice(8, 10) <= elapsed)));
     const previousObserved = observedMonths.includes(previousMonths[0]);
     const top = [...categories].sort((a, b) => (b.spent - b.budget) - (a.spent - a.budget)).find(x => x.spent > x.budget);
-    const stage = mode === 'past' ? '月份回顧' : mode === 'future' ? '尚未開始' : st.unresolved ? '先核對卡片歸屬' : uncertain ? '先補帳單或刷卡預留' : afterReserve < 0 ? '先補現金缺口' : gap > 0 ? '優先建立安全墊' : '可評估追加投資';
+    const stage = mode === 'past' ? '月份回顧' : mode === 'future' ? '尚未開始' : st.unresolved ? '先核對卡片歸屬' : st.cashNeedsReview ? '先核對實際現金' : uncertain ? '先補帳單或刷卡預留' : afterReserve < 0 ? '先補現金缺口' : gap > 0 ? '優先建立安全墊' : '可評估追加投資';
     return { mode, stage, categories, remainingDays, remainingLiving, necessaryReserve,unbilledReserve,uncertain, fixedRemaining, spendingAvailable, planned, forecast, cashBase, afterReserve, available, gap, emergency, core, flex,
       historyMonths:observedMonths.length, previousExpense:previousObserved ? previousExpense : null, expenseDelta:previousObserved ? st.monthExpense - previousExpense : null,
       dailyLimit:remainingDays > 0 ? Math.floor(spendingAvailable / remainingDays) : 0, top };
