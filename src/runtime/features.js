@@ -8,6 +8,10 @@ window.MILLIONPROJECT_FEATURE_VERSION="features-23";
   const monthNow=()=>new Date().toISOString().slice(0,7);
   const escx=s=>String(s??'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 
+  const planStyle=document.createElement('style');
+  planStyle.textContent=`.mp-dca-plan-card{display:block;border:1px solid #e5e7eb;border-radius:14px;padding:16px;margin-top:10px;min-width:0}.mp-dca-plan-card>.split{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}.mp-dca-plan-card>.split>div{flex:1;min-width:180px;overflow-wrap:anywhere}.mp-dca-plan-card>.split>.pill{flex-shrink:0}.mp-dca-plan-card .tiny{line-height:1.7;margin-top:4px}.mp-dca-plan-card>.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.mp-dca-plan-card>.actions .btn{min-height:42px;white-space:nowrap}@media(max-width:480px){.mp-dca-plan-card{padding:13px}.mp-dca-plan-card>.actions .btn{flex:1 0 auto}}`;
+  document.head.appendChild(planStyle);
+
   function closePlanModal(){document.getElementById('mp-plan-modal')?.remove();}
   window.mpClosePlanModal=closePlanModal;
 
@@ -142,7 +146,7 @@ window.MILLIONPROJECT_FEATURE_VERSION="features-23";
           const ended=!!end&&end<month;
           const label=!active?'已暫停':ended?'已結束':start>month?'尚未開始':'啟用中';
           const pill=!active||ended?'watch':live?'buy':'';
-          return `<div class="mp-plan-row" style="border:1px solid #e5e7eb;border-radius:14px;padding:12px;margin-top:8px">
+          return `<div class="mp-dca-plan-card">
             <div class="split">
               <div><b>${escx(p.symbol)} ${escx(p.name||'')}</b><div class="tiny">每月 ${moneyx(p.monthly_amount)} · ${p.execution_day} 日 · ${start} 開始${end?' · '+end+' 結束':''}</div></div>
               <span class="pill ${pill}">${label}</span>
