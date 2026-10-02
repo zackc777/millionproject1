@@ -99,7 +99,7 @@
     const mode = st.month < today.slice(0, 7) ? 'past' : st.month > today.slice(0, 7) ? 'future' : 'current';
     const days = new Date(Date.UTC(+st.month.slice(0, 4), +st.month.slice(5, 7), 0)).getUTCDate();
     const elapsed = mode === 'current' ? +today.slice(8, 10) : mode === 'past' ? days : 0;
-    const remainingDays = days - elapsed;
+    const remainingDays = mode === 'current' ? days - elapsed + 1 : mode === 'future' ? days : 0;
     const previousMonths = [1, 2, 3].map(i => cardModel.shiftMonth(st.month + '-01', -i).slice(0, 7));
     // Only months with observed expenses are samples; absent records are not a zero-spend month.
     const observedMonths = previousMonths.filter(m => st.all.some(x => monthOf(x) === m && x.entry_type === 'expense'));
@@ -120,12 +120,22 @@
     const remainingLiving = categories.reduce((n, x) => n + x.remaining, 0);
     const forecast = st.monthExpense + remainingLiving;
     const planned = keys.reduce((n, key) => n + Math.max(0, Number(profile[key]) || 0), 0);
-    const cashBase = Math.min(st.monthUnallocated, st.liquidCash);
+    // Liquid cash includes prior-month carryover, excluding earmarked savings.
+    const cashBase = st.liquidCash;
     // Unclassified upcoming card spending may already be part of living budgets.
     // Reserve the larger pool, not their sum; do not claim exact categorisation.
     const unbilledReserve=st.statementReserve?.total||0;
     const necessaryReserve=Math.max(remainingLiving,unbilledReserve);
-    const uncertain=!!st.statementReserve?.uncertain||!!st.cashNeedsReview;
+    const reasons=[];
+    if(st.cashAge===null)reasons.push({text:'尚未核對實際銀行餘額與現金',action:'cash'});
+    else if(st.cashAge>31)reasons.push({text:'現金對帳已超過 31 天',action:'cash'});
+    if(st.emergency<0||st.otherSaving<0)reasons.push({text:'專用存款餘額需要核對',action:'cash'});
+    if(st.unresolved)reasons.push({text:'有紀錄尚未指定正確信用卡',action:'card'});
+    for(const row of st.statementReserve?.rows||[]){
+      if(row.missing)reasons.push({text:row.issuer+' 尚缺 '+row.latestEnd.slice(0,7)+' 帳單',action:'card'});
+      if(row.unknown)reasons.push({text:row.issuer+' 尚未設定刷卡預留，歷史帳單也不足',action:'card'});
+    }
+    const uncertain=reasons.length>0;
     const afterReserve = cashBase - st.cardDebt - necessaryReserve;
     const available = mode === 'current' && !st.unresolved && !uncertain ? Math.max(0, Math.floor(afterReserve)) : 0;
     const fixedRemaining = categories.filter(x => x.fixed).reduce((n, x) => n + x.remaining, 0);
@@ -144,7 +154,7 @@
     const previousObserved = observedMonths.includes(previousMonths[0]);
     const top = [...categories].sort((a, b) => (b.spent - b.budget) - (a.spent - a.budget)).find(x => x.spent > x.budget);
     const stage = mode === 'past' ? '月份回顧' : mode === 'future' ? '尚未開始' : st.unresolved ? '先核對卡片歸屬' : st.cashNeedsReview ? '先核對實際現金' : uncertain ? '先補帳單或刷卡預留' : afterReserve < 0 ? '先補現金缺口' : gap > 0 ? '優先建立安全墊' : '可評估追加投資';
-    return { mode, stage, categories, remainingDays, remainingLiving, necessaryReserve,unbilledReserve,uncertain, fixedRemaining, spendingAvailable, planned, forecast, cashBase, afterReserve, available, gap, emergency, core, flex,
+    return { mode, stage, reasons, budgetDaily:remainingDays>0?Math.floor(variableRemaining/remainingDays):0, categories, remainingDays, remainingLiving, necessaryReserve,unbilledReserve,uncertain, fixedRemaining, spendingAvailable, planned, forecast, cashBase, afterReserve, available, gap, emergency, core, flex,
       historyMonths:observedMonths.length, previousExpense:previousObserved ? previousExpense : null, expenseDelta:previousObserved ? st.monthExpense - previousExpense : null,
       dailyLimit:remainingDays > 0 ? Math.floor(spendingAvailable / remainingDays) : 0, top };
   }
