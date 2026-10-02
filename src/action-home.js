@@ -78,6 +78,7 @@
     const urgent=todo.filter(x=>x.priority<=3);
     return `<main class="mp-v-page">
       <header class="mp-v-top"><div><div class="section-kicker">${esc(st.month)} · 財務總覽</div><h2>生活有餘裕，目標有進度。</h2><p>截至 ${esc(st.asOf)} · 依已記錄金流與市場行情估算</p></div><div class="mp-v-tools">${button(quick,'＋ 記一筆','main')}${button(cash,'核對餘額')}<button class="btn ghost" onclick="mpOpenActionSearch()">其他操作 ⌕</button></div></header>
+      ${mpVisualGoalHero(st,target)}
       ${mpVisualSummary(st,plan)}
       <aside class="mp-v-insight ${blocked||plan.afterReserve<0?'warn':''}"><div><b>${blocked?'先補齊資料，每日可花才更準確':plan.afterReserve<0?'這個月先留住現金':'目前日常可用 '+fmt(plan.spendingAvailable)}</b><p>${blocked?(plan.reasons||[]).map(x=>esc(x.text)).join('；')||'仍有未確認的金流需要核對':plan.afterReserve<0?'按生活預算與卡費預留，仍差 '+fmt(-plan.afterReserve)+'；暫不追加存款或投資。':'含今天剩 '+plan.remainingDays+' 天。每天可花已保留待繳卡費與固定責任，不挪用預備金。'}</p></div>${button(urgent[0]?.id??budget,blocked?'補齊資料':'調整預算')}</aside>
       <section class="mp-v-grid"><article class="mp-v-panel">${mpVisualAssets(st)}</article><article class="mp-v-panel">${mpVisualFlows(st)}</article></section>
