@@ -48,13 +48,14 @@ function mpSpendingReviewHtml(st, plan) {
       ${plan.mode === 'current' ? `<div class="advice-item"><span>接下來可用於日常花費</span><b>${plan.uncertain||st.unresolved?'待核對':money(plan.spendingAvailable)}</b></div><div class="advice-item"><span>含今天 ${plan.remainingDays} 天，每日上限</span><b>${plan.uncertain||st.unresolved?'待核對':money(plan.dailyLimit)}</b></div><p class="tiny">已保留待繳卡費、未付固定費用與額外未出帳預留。日常可用金額包含在生活預留內，不可再加到投資配置。</p>` : ''}
     </div>
     <p class="tiny">${plan.historyMonths ? `參考最近三個月中 ${plan.historyMonths} 個有消費紀錄的月份` : '歷史資料不足，先使用你設定的生活預算'}；固定項目保留尚未支付部分，可分類的變動項目取預算、歷史中位數與本月速度的較高值。未分類與帳單彙總不推估重複消費。本月未滿 7 天不推估消費速度；漏記會影響結果。</p>
-    ${plan.categories.filter(x => x.spent || x.budget || x.remaining).map(x => `<div class="mp-category-review"><b>${esc(x.label)}</b><span>已花 ${money(x.spent)} · ${plan.mode === 'past' ? '預算' : '預估'} ${money(plan.mode === 'past' ? x.budget : x.forecast)}</span></div>`).join('')}
+
     <div class="status-note" style="margin-top:12px">${plan.afterReserve < 0 ? `現金預留缺口 ${money(-plan.afterReserve)}：先檢查未繳帳單與固定責任，調低可延後的花費。` : over ? `按目前紀錄推估會超過生活預算 ${money(over)}。先檢查花費增加的類別，再調整生活預算。` : '持續記錄實際花費；消費、繳款與預算改動後，剩餘配置會同步更新。'}</div>`;
 }
 function mpRenderRolling(st) {
   const plan = MPFinanceModel.rolling(st, getBudgetProfile(), getEmergencyGoalCached());
   if ($('mp-finance-today')) $('mp-finance-today').innerHTML=mpFinanceTodayHtml(st,plan);
   if ($('allocBox')) $('allocBox').innerHTML = mpRollingAllocationHtml(st, plan);
+  if ($('mp-visual-budget')) $('mp-visual-budget').innerHTML=mpVisualBudget(st,plan);
   if ($('mp-spending-review')) $('mp-spending-review').innerHTML = mpSpendingReviewHtml(st, plan);
   return plan;
 }

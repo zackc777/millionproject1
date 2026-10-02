@@ -990,7 +990,7 @@ async function monthly(){
       <div>
         <div class="section-kicker">MONTH CENTER · 每月財務中心</div>
         <div class="month-title-main">📅 ${financeMonthLabel(selected)}</div>
-        <div class="month-title-sub">先看現金與可花金額；要修改薪資、預算或看明細，再展開下方區塊。</div>
+        <div class="month-title-sub">現金、消費、預算與資產圖表直接呈現；設定與交易明細按需要展開。</div>
       </div>
       <div class="month-switcher">
         <button class="month-nav-btn" onclick="shiftFinanceMonth(-1)" title="上一個月">‹</button>
@@ -1004,6 +1004,18 @@ async function monthly(){
     <div id="mp-finance-today" style="margin-top:18px">${mpFinanceTodayHtml(state,plan)}</div>
   </section>
 
+  <section class="mp-v-grid mp-v-month-charts">
+    <article class="mp-v-panel">${mpVisualFlows(state)}</article>
+    <article class="mp-v-panel">${mpVisualSpending(state,plan)}</article>
+    <article id="mp-visual-budget" class="mp-v-panel">${mpVisualBudget(state,plan)}</article>
+    <article class="mp-v-panel">${mpVisualAssets({...state,investmentValue:displayInvestment,totalAssets:displayTotal})}</article>
+  </section>
+  <section class="mp-v-grid mp-v-month-charts">
+    <article class="mp-v-panel" id="allocBox" aria-live="polite">${mpRollingAllocationHtml(state,plan)}</article>
+    <article class="mp-v-panel" id="mp-spending-review">${mpSpendingReviewHtml(state,plan)}</article>
+  </section>
+  ${emergencyPanelHtml(state,eTarget)}
+
   <details id="mp-income-fold" class="mp-finance-fold salary-start" ${salary>0?'':'open'}><summary>薪資與收入 <small>${salary>0?'已登錄實領薪資 '+money(salary):'尚未登錄薪資；現有結轉現金仍可使用'}</small></summary>
     <div class="section-title"><div><div class="section-kicker">STEP 1 · INCOME</div><h2>① ${financeMonthLabel(selected)}先從實領薪資開始</h2><p class="muted" style="margin:4px 0 0">月份已由上方「每月財務中心」決定，這裡不再讓你重複選月份。</p></div><span class="pill">${selected}</span></div>
     <input id="salary_month" type="hidden" value="${selected}">
@@ -1015,16 +1027,6 @@ async function monthly(){
   </details>
 
   <details id="mp-budget-fold" class="mp-finance-fold"><summary>生活預算設定 <small>本月上限 ${money(planned)}</small></summary><div id="mp-life-budget-card" class="card" aria-live="polite"><div class="empty">正在整理生活責任…</div></div></details>
-  <details class="mp-finance-fold"><summary>存款與投資配置 <small>${plan.uncertain?'先補齊資料':'可追加投資上限 '+money(plan.core)}</small></summary><div id="allocBox" aria-live="polite">${mpRollingAllocationHtml(state,plan)}</div></details>
-  <details class="mp-finance-fold"><summary>花費分析與資金流 <small>查看分類、預算差異及收入去向</small></summary>
-  <section class="grid g2" style="margin-top:14px">
-    <div class="card"><div class="section-title"><div><div class="section-kicker">STEP 3 · LIVE FLOW</div><h3>③ ${financeMonthLabel(selected)}資金流</h3></div><span class="live-badge">即時</span></div>${flowVisualHtml(state)}<div style="margin-top:10px">${progressRow('現金消費',state.monthCashExpense,incomeBase,'#f97316')}${progressRow('繳卡費',state.monthCardPayments,incomeBase,'#eab308')}${progressRow('預備金',p.emergency,incomeBase,'#10b981')}${progressRow('其他存款',p.otherSaving,incomeBase,'#14b8a6')}${progressRow('已投資',investment,incomeBase,'#6366f1')}${progressRow('資金餘額',unalloc,incomeBase,'#94a3b8')}</div></div>
-    <div id="mp-spending-review" class="card">${mpSpendingReviewHtml(state,plan)}</div>
-  </section>
-
-  ${emergencyPanelHtml(state,eTarget)}
-
-  </details>
 
   <section class="card" id="ledgerBox" style="margin-top:14px">
     <div class="section-title"><div><div class="section-kicker">STEP 4 · ACTUAL LEDGER</div><h3>④ 只記真正發生的金流</h3><div class="tiny">這裡新增、修改或刪除後，上面的色條、預備金、首頁與當月摘要會一起更新。</div></div><span class="pill">${selected}</span></div>
