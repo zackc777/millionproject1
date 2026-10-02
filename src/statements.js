@@ -12,7 +12,7 @@
   root.mpNewStatement=async(cardId)=>{
     try{
       const [statements,cards,entries,payments]=await all();const card=cards.find(c=>String(c.id)===String(cardId));if(!card)throw new Error('卡片不存在');
-      const end=S.latest(card);const existing=statements.find(s=>String(s.credit_card_id)===String(card.id)&&s.cycle_end===end);
+      const end=S.latest(card);const existing=statements.find(s=>String(s.credit_card_id)===String(card.id)&&s.cycle_end.slice(0,7)===end.slice(0,7));
       if(existing)return root.mpEditStatement(existing.id);
       const previous=M.shiftMonth(end,-1,card.statement_day),start=new Date(Date.parse(previous+'T00:00:00Z')+86400000).toISOString().slice(0,10);
       await open({credit_card_id:card.id,cycle_start:start,cycle_end:end,due_date:M.shiftMonth(end,1,card.due_day),total:'',carryover:0,categories:{}},cards,entries,statements,payments);
@@ -89,7 +89,7 @@
   root.mpStatementPanel=st=>{
     const statements=st.statements||[];
     const reminders=st.cards.filter(c=>c.status!=='inactive').map(card=>{
-      const end=S.latest(card),s=statements.find(x=>String(x.credit_card_id)===String(card.id)&&x.cycle_end===end);
+      const end=S.latest(card),s=statements.find(x=>String(x.credit_card_id)===String(card.id)&&x.cycle_end.slice(0,7)===end.slice(0,7));
       return `<div class="mp-statement-task"><div><b>${escape(card.issuer+' · '+card.card_name)}</b><div class="tiny">${end} 結帳 · ${s?escape(s.due_date):M.shiftMonth(end,1,card.due_day)} 繳款</div></div><button class="btn ${s?'ghost':'main'}" onclick="mpNewStatement('${card.id}')">${s?'查看本期帳單':'登錄帳單'}</button></div>`;
     }).join('');
     const history=[...statements].sort((a,b)=>b.cycle_end.localeCompare(a.cycle_end)).map(s=>{
