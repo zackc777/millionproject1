@@ -764,13 +764,12 @@ function emergencyPanelHtml(st,target){
   </section>`;
 }
 async function overview(){
-  const activeMonth=MPCardModel.today().slice(0,7);
-  const [d,t,r,st]=await Promise.all([q('investment_decisions',{order:'decision_date'}),q('tasks',{order:'created_at'}),q('research_assets',{order:'updated_at'}),moneyEngine(activeMonth),loadEmergencyGoal()]);
-  const target=getGoal(),eTarget=getEmergencyGoalCached(),goal=Math.min(100,Math.max(0,st.totalAssets)/target*100),sr=st.monthIncome?((st.monthSaving+st.monthInvestment)/st.monthIncome*100):0,ir=st.monthIncome?(st.monthInvestment/st.monthIncome*100):0,ep=Math.min(100,Math.max(0,st.emergency)/eTarget*100),done=t.filter(z=>z.status==='done').length,eGap=Math.max(0,eTarget-st.emergency);
-  const plan=MPFinanceModel.rolling(st,getBudgetProfile(),eTarget),strategy=plan.afterReserve<0?`本月資金預留缺口 ${money(-plan.afterReserve)}，先核對帳單與生活責任。`:`${plan.stage}：生活還需預留 ${money(plan.remainingLiving)}、待繳卡費 ${money(st.cardDebt)}，剩餘可追加 ${money(plan.available)}。`;
-  $('app').innerHTML=`<section class="grid g4"><div class="card hero" style="grid-column:span 2"><div class="eyebrow">MILLION PROJECT / LIVE MONEY ENGINE</div><div class="split" style="margin-top:7px"><div><div class="big">${money(st.totalAssets)}</div><div style="color:#cbd5e1">依金流／對帳推估淨資產</div></div><span class="pill" style="background:#ffffff14;color:#fff;border-color:#ffffff24">${goal.toFixed(1)}%</span></div><div class="bar" style="margin-top:14px;background:#334155"><i style="width:${goal}%"></i></div><div class="split tiny" style="color:#cbd5e1;margin-top:5px"><span>資產目標 ${money(target)}</span><span>差額 ${money(Math.max(0,target-st.totalAssets))}</span></div></div><div class="metric"><div class="label">本月儲蓄＋投資率</div><div class="num">${st.monthIncome?sr.toFixed(1)+'%':'—'}</div><div class="tiny">（存款＋投資）／收入</div></div><div class="metric"><div class="label">本月投資率</div><div class="num">${st.monthIncome?ir.toFixed(1)+'%':'—'}</div><div class="tiny">實際投資／收入</div></div></section>
-  <section class="grid g2" style="margin-top:14px"><div class="card emergency-panel"><div class="split"><div><div class="section-kicker">EMERGENCY FUND</div><h3 style="margin:3px 0">🏦 緊急預備金</h3></div><button class="btn ghost" onclick="setEmergencyTarget()">修改目標</button></div><div class="split" style="margin-top:10px"><div><div class="emergency-number">${money(st.emergency)}</div><div class="tiny">目前累積／目標 ${money(eTarget)}</div></div><div style="text-align:right"><b>${ep.toFixed(1)}%</b><div class="tiny">還差 ${money(eGap)}</div></div></div><div class="emergency-track"><i style="width:${ep}%"></i></div></div><div class="card"><div class="section-kicker">${activeMonth} MONEY FLOW</div><h3>本月收入去哪裡了</h3>${flowVisualHtml(st)}<div class="money-status"><div class="box"><div class="k">收入</div><div class="n">${money(st.monthIncome)}</div></div><div class="box"><div class="k">支出</div><div class="n">${money(st.monthExpense)}</div></div><div class="box"><div class="k">已存</div><div class="n">${money(st.monthSaving)}</div></div><div class="box"><div class="k">已投資</div><div class="n">${money(st.monthInvestment)}</div></div><div class="box"><div class="k">本月資金增減</div><div class="n">${money(Math.max(0,st.monthUnallocated))}</div></div></div></div></section>
-  ${mpCashFlowHtml(st)}<section class="card" style="margin-top:14px">${mpFinanceTodayHtml(st,plan)}</section><section class="grid g3" style="margin-top:14px"><div class="card"><div class="k">資產結構</div><div class="advice-list"><div class="advice-item"><span>可用現金</span><b>${money(st.liquidCash)}</b></div><div class="advice-item"><span>緊急預備金</span><b>${money(st.emergency)}</b></div><div class="advice-item"><span>其他存款</span><b>${money(st.otherSaving)}</b></div><div class="advice-item"><span>投資資產</span><b>${money(st.investmentValue)}</b></div></div></div><div class="card"><div class="k">本月建議</div><div class="recommend"><b>${esc(strategy)}</b><div class="tiny" style="margin-top:5px">以金流及最近對帳餘額推估；漏記時請核對實際現金。</div></div></div><div class="card"><div class="k">研究系統</div><div class="split" style="margin-top:9px"><span class="pill">研究 ${r.length}</span><span class="pill">決策 ${d.length}</span><span class="pill">任務 ${done}/${t.length}</span></div></div></section>`;
+  const activeMonth=MPCardModel.today().slice(0,7),userId=u?.id;
+  const [d,r,st,plans]=await Promise.all([q('investment_decisions',{order:'decision_date'}),q('research_assets',{order:'updated_at'}),moneyEngine(activeMonth),readMoneyTable('investment_plans','created_at').catch(()=>null),loadEmergencyGoal()]);
+  if(u?.id!==userId||tab!=='o')return;
+  const target=getGoal(),eTarget=getEmergencyGoalCached();
+  const plan=MPFinanceModel.rolling(st,getBudgetProfile(),eTarget);
+  $('app').innerHTML=mpActionHomeHtml(st,plan,{target,emergencyTarget:eTarget,plans,researchCount:r.length,decisionCount:d.length});
 }
 async function monthly(){
   await loadEmergencyGoal();
@@ -1005,7 +1004,7 @@ async function monthly(){
     <div id="mp-finance-today" style="margin-top:18px">${mpFinanceTodayHtml(state,plan)}</div>
   </section>
 
-  <details class="mp-finance-fold salary-start" ${salary>0?'':'open'}><summary>薪資與收入 <small>${salary>0?'已登錄實領薪資 '+money(salary):'尚未登錄薪資；現有結轉現金仍可使用'}</small></summary>
+  <details id="mp-income-fold" class="mp-finance-fold salary-start" ${salary>0?'':'open'}><summary>薪資與收入 <small>${salary>0?'已登錄實領薪資 '+money(salary):'尚未登錄薪資；現有結轉現金仍可使用'}</small></summary>
     <div class="section-title"><div><div class="section-kicker">STEP 1 · INCOME</div><h2>① ${financeMonthLabel(selected)}先從實領薪資開始</h2><p class="muted" style="margin:4px 0 0">月份已由上方「每月財務中心」決定，這裡不再讓你重複選月份。</p></div><span class="pill">${selected}</span></div>
     <input id="salary_month" type="hidden" value="${selected}">
     <div class="row" style="align-items:end">
@@ -1015,7 +1014,7 @@ async function monthly(){
     ${salary>0?`<div class="call" style="margin-top:12px"><b>${financeMonthLabel(selected)}理財已啟動：${money(salary)}</b><br><span class="muted">後續支出、存款與投資都會自動歸到這個月份。</span></div>`:`<div class="status-note" style="margin-top:12px"><b>尚未登錄本月薪資。</b> 配置已使用結轉現金計算；薪資實際入帳後再登錄，即會更新。</div>`}
   </details>
 
-  <details class="mp-finance-fold"><summary>生活預算設定 <small>本月上限 ${money(planned)}</small></summary><div id="mp-life-budget-card" class="card" aria-live="polite"><div class="empty">正在整理生活責任…</div></div></details>
+  <details id="mp-budget-fold" class="mp-finance-fold"><summary>生活預算設定 <small>本月上限 ${money(planned)}</small></summary><div id="mp-life-budget-card" class="card" aria-live="polite"><div class="empty">正在整理生活責任…</div></div></details>
   <details class="mp-finance-fold"><summary>存款與投資配置 <small>${plan.uncertain?'先補齊資料':'可追加投資上限 '+money(plan.core)}</small></summary><div id="allocBox" aria-live="polite">${mpRollingAllocationHtml(state,plan)}</div></details>
   <details class="mp-finance-fold"><summary>花費分析與資金流 <small>查看分類、預算差異及收入去向</small></summary>
   <section class="grid g2" style="margin-top:14px">
@@ -1031,7 +1030,7 @@ async function monthly(){
     <div class="section-title"><div><div class="section-kicker">STEP 4 · ACTUAL LEDGER</div><h3>④ 只記真正發生的金流</h3><div class="tiny">這裡新增、修改或刪除後，上面的色條、預備金、首頁與當月摘要會一起更新。</div></div><span class="pill">${selected}</span></div>
     <details class="mp-finance-fold"><summary>新增一筆金流 <small>收入、支出、存款或投資</small></summary><div class="entry-form"><div class="field"><label>日期</label><input id="ed" type="date" value="${selected}-01"></div><div class="field"><label>這筆是</label><select id="et" onchange="refreshEntryCategories()"><option value="expense">支出</option><option value="income">其他收入</option><option value="saving">存款／留存</option><option value="investment">投資</option></select></div><div class="field"><label>用途</label><select id="ec"></select></div><div class="field"><label>金額</label><input id="ea" type="number" min="0" placeholder="0"></div><div class="field"><label>付款／來源</label><select id="epm"><option>銀行轉帳／現金</option><option>台新</option><option>富邦</option><option>國泰</option><option>證券交割</option><option>其他</option></select></div><button class="btn main" onclick="addFinanceEntry()">＋ 新增</button></div>
     <div class="field" style="margin-top:9px"><label>備註（可省略）</label><input id="en" placeholder="例如：房租、超市、0050 定期定額"></div></details><div id="entrySummary" style="margin-top:14px"></div>
-    <details class="mp-ledger-details"><summary><strong id="mp-ledger-count">收支明細</strong><span>展開／收折 · 每頁 8 筆</span></summary>
+    <details id="mp-ledger-fold" class="mp-ledger-details"><summary><strong id="mp-ledger-count">收支明細</strong><span>展開／收折 · 每頁 8 筆</span></summary>
     <div class="scroll"><table class="entry-table mp-ledger-table"><thead><tr><th>日期</th><th>類型</th><th>用途</th><th>金額</th><th>付款方式</th><th>備註</th><th>操作</th></tr></thead><tbody id="entryRows"></tbody></table></div>
     <div id="mp-ledger-pager" class="mp-ledger-pager" aria-label="收支明細分頁"></div></details>
   </section>
