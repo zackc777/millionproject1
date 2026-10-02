@@ -93,7 +93,7 @@
       const estimate=Number(card.monthly_spend_cap)>0?Number(card.monthly_spend_cap):amounts.length>=3?amounts[1]:0;
       const next=M.cycleEnd(st.asOf,card.statement_day),end=next<=st.asOf?M.shiftMonth(next,1,card.statement_day):next;
       const observed=st.bills.filter(b=>String(b.cardId)===String(card.id)&&b.cycleEnd===end).reduce((n,b)=>n+b.spent,0);
-      const latestEnd=latest(card,st.asOf),missing=!(st.statements||[]).some(s=>String(s.credit_card_id)===String(card.id)&&s.cycle_end===latestEnd);
+      const latestEnd=latest(card,st.asOf),missing=!(st.statements||[]).some(s=>String(s.credit_card_id)===String(card.id)&&s.cycle_end.slice(0,7)===latestEnd.slice(0,7));
       return {cardId:card.id,issuer:card.issuer,cycleEnd:end,estimate,remaining:Math.max(0,estimate-observed),unknown:estimate===0,missing,latestEnd,source:Number(card.monthly_spend_cap)>0?'自訂刷卡預留':'最近三期一般帳單中位數'};
     });
     return {rows,total:rows.reduce((n,x)=>n+x.remaining,0),uncertain:rows.some(x=>x.unknown||x.missing)};
