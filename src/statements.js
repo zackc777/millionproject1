@@ -14,7 +14,7 @@
       const [statements,cards,entries,payments]=await all();const card=cards.find(c=>String(c.id)===String(cardId));if(!card)throw new Error('卡片不存在');
       const end=S.latest(card);const existing=statements.find(s=>String(s.credit_card_id)===String(card.id)&&s.cycle_end.slice(0,7)===end.slice(0,7));
       if(existing)return root.mpEditStatement(existing.id);
-      const previous=M.shiftMonth(end,-1,card.statement_day),start=new Date(Date.parse(previous+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+      const start=S.periodStart(card,end,statements);
       await open({credit_card_id:card.id,cycle_start:start,cycle_end:end,due_date:M.shiftMonth(end,1,card.due_day),total:'',carryover:0,categories:{}},cards,entries,statements,payments);
     }catch(e){alert('無法開啟帳單：'+e.message);}
   };
@@ -30,7 +30,8 @@
       <div class="field"><label for="mpst-cycle">帳單结帳日／期別</label><input id="mpst-cycle" type="date" max="${M.today()}" value="${row.cycle_end}" ${row.id?'disabled':''} onchange="mpStatementDateChanged(false)"></div>
       <div class="field"><label for="mpst-total">本期應繳總額</label><input id="mpst-total" type="number" min="0" step="0.01" inputmode="decimal" value="${row.total}" oninput="mpStatementPreview()"></div>
       <div class="field"><label for="mpst-due">帳單實際繳款期限</label><input id="mpst-due" type="date" value="${row.due_date}"></div></div>
-      <details ${Number(row.carryover)>0?'open':''}><summary>含上期未繳、退款、分期或費用</summary><div class="field"><label for="mpst-start">帳單涵蓋起日（依銀行帳單核對）</label><input id="mpst-start" type="date" value="${row.cycle_start||''}" ${row.id?'disabled':''} onchange="mpStatementPreview()"></div><div class="field"><label for="mpst-carry">總額中包含的上期未繳</label><input id="mpst-carry" type="number" min="0" step="0.01" value="${row.carryover||0}" oninput="mpStatementPreview()"></div><p class="tiny">總額填銀行本期應繳金額，已包含本期分期、費用及扣除退款；不再加一次。上期未繳會排除於新增消費，繳款優先結清其中的舊欠款。未來分期尚未出帳，不在此當作本期費用。</p></details>
+      <div class="field"><label for="mpst-start">帳單涵蓋起日</label><input id="mpst-start" type="date" value="${row.cycle_start||''}" ${row.id?'disabled':''} onchange="mpStatementPreview()"><p class="tiny">有前一期帳單時，從其結帳日隔天預填；沒有時依卡片設定推算。請以銀行帳單起訖日為準。</p></div>
+      <details ${Number(row.carryover)>0?'open':''}><summary>含上期未繳、退款、分期或費用</summary><div class="field"><label for="mpst-carry">總額中包含的上期未繳</label><input id="mpst-carry" type="number" min="0" step="0.01" value="${row.carryover||0}" oninput="mpStatementPreview()"></div><p class="tiny">總額填銀行本期應繳金額，已包含本期分期、費用及扣除退款；不再加一次。上期未繳會排除於新增消費，繳款優先結清其中的舊欠款。未來分期尚未出帳，不在此當作本期費用。</p></details>
       <details><summary>簡單分類（選填，不用逐筆輸入）</summary><div class="mp-statement-fields">${Object.entries(S.categories).filter(([k])=>k!=='other').map(([k,label])=>`<div class="field"><label for="mpst-cat-${k}">${label}</label><input id="mpst-cat-${k}" type="number" min="0" step="0.01" value="${Number(row.categories?.[k])||0}" oninput="mpStatementPreview()"></div>`).join('')}</div><p class="tiny">只分本期新增消費。剩餘自動列未分類；未分類不推測花費用途。</p></details>
       <label><input id="mpst-once" type="checkbox" ${row.one_off?'checked':''}> 本期含一次性大額消費，不作為一般帳單預估樣本</label>
       <div class="field"><label for="mpst-note">備註（選填）</label><input id="mpst-note" value="${escape(row.note)}" placeholder="例如：旅遊、分期第 2/6 期、退款"></div>
@@ -43,7 +44,7 @@
   root.mpStatementDateChanged=async changeCard=>{
     const card=editing?.cards.find(c=>String(c.id)===value('card'));if(!card)return;
     if(changeCard)$('mpst-cycle').value=S.latest(card);
-    try{$('mpst-due').value=M.shiftMonth(value('cycle'),1,card.due_day);$('mpst-start').value=new Date(Date.parse(M.shiftMonth(value('cycle'),-1,card.statement_day)+'T00:00:00Z')+86400000).toISOString().slice(0,10);await root.mpStatementPreview();}catch(e){$('mpst-error').textContent=e.message;}
+    try{$('mpst-due').value=M.shiftMonth(value('cycle'),1,card.due_day);$('mpst-start').value=S.periodStart(card,value('cycle'),editing.statements);await root.mpStatementPreview();}catch(e){$('mpst-error').textContent=e.message;}
   };
   root.mpStatementPreview=async()=>{
     if(!editing||!$('mpst-preview'))return;
@@ -52,7 +53,8 @@
     const net=Number(value('total'))-Number(value('carry'));
     const allocated=Object.keys(S.categories).filter(k=>k!=='other').reduce((n,k)=>n+Number(value('cat-'+k)),0);
     const prior=MPFinanceModel.ledger({month:M.today().slice(0,7),entries:editing.entries||[],cards:editing.cards,statements:editing.statements||[],payments:editing.payments||[]}).bills.filter(b=>String(b.cardId)===id&&b.cycleEnd<cycle).reduce((n,b)=>n+b.outstanding,0);
-    $('mpst-preview').textContent=`本期新增消費 ${money(net)}；其中未分類 ${money(net-allocated)}。同一期原有逐筆合計 ${money(existing)}，與本期新增差額 ${money(net-existing)}。儲存後以帳單統計，不會相加，也不會立即扣現金。${prior>0?' 目前較早期仍有 '+money(prior)+' 未清，請展開特殊項目，核對本次總額是否包含上期未繳。':''}`;
+    const conflict=S.overlapping({id:editing.id,credit_card_id:id,cycle_start:value('start'),cycle_end:cycle},editing.statements);
+    $('mpst-preview').textContent=`涵蓋 ${value('start')}～${cycle}。${conflict?'與已登錄的 '+conflict.cycle_start+'～'+conflict.cycle_end+' 帳單重疊，請核對涵蓋起日。 ':''}本期新增消費 ${money(net)}；其中未分類 ${money(net-allocated)}。同一期原有逐筆合計 ${money(existing)}，與本期新增差額 ${money(net-existing)}。儲存後以帳單統計，不會相加，也不會立即扣現金。${prior>0?' 目前較早期仍有 '+money(prior)+' 未清，請展開特殊項目，核對本次總額是否包含上期未繳。':''}`;
   };
   root.mpSaveStatement=async()=>{
     if(busy||!editing)return;busy=true;const original=editing;const button=$('mpst-save');if(button)button.disabled=true;
@@ -62,6 +64,10 @@
       if(value('total')==='')throw new Error('請填應繳總額，零元帳單請填 0');
       const row=S.validate({user_id:u.id,credit_card_id:original.id?original.credit_card_id:value('card'),cycle_end:original.id?original.cycle_end:value('cycle'),due_date:value('due'),total:Number(value('total')),carryover:Number(value('carry')),categories:Object.fromEntries(Object.keys(S.categories).filter(k=>k!=='other').map(k=>[k,Number(value('cat-'+k))])),one_off:!!$('mpst-once')?.checked,note:value('note')});
       row.cycle_start=original.id?original.cycle_start:value('start');M.parts(row.cycle_start);S.validate(row);
+      const latestStatements=await readMoneyTable('credit_card_statements','cycle_end');
+      if(!u?.id||u.id!==original.sessionUser)throw new Error('登入狀態已變更，請重新開啟帳單');
+      const conflict=S.overlapping({...row,id:original.id},latestStatements);
+      if(conflict)throw new Error(`涵蓋 ${row.cycle_start}～${row.cycle_end} 與已登錄的 ${conflict.cycle_start}～${conflict.cycle_end} 帳單重疊，請核對上方涵蓋起日；同一期請使用編輯。`);
       const result=original.id?await c.from('credit_card_statements').update(row).eq('user_id',u.id).eq('id',original.id).eq('revision',original.revision).select('id'):await c.from('credit_card_statements').insert(row).select('id');
       if(result.error)throw new Error(result.error.code==='23505'?'這張卡此期已有帳單，請開啟歷史帳單編輯':result.error.message);
       if(!result.data?.length)throw new Error('帳單已由其他裝置更新，請重新開啟後核對');
