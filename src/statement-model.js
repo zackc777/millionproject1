@@ -9,6 +9,17 @@
     const end=M.cycleEnd(today,card.statement_day);
     return end<=today?end:M.shiftMonth(end,-1,card.statement_day);
   }
+  // Only bridge an adjacent saved period; missing months must not be swallowed.
+  function periodStart(card,end,statements=[]){
+    M.parts(end);
+    const previousMonth=M.shiftMonth(end,-1,card.statement_day);
+    const previous=statements.filter(s=>String(s.credit_card_id)===String(card.id)&&s.cycle_end.slice(0,7)===previousMonth.slice(0,7)&&s.cycle_end<end).sort((a,b)=>b.cycle_end.localeCompare(a.cycle_end))[0];
+    const boundary=previous?.cycle_end||previousMonth;
+    return new Date(Date.parse(boundary+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+  }
+  function overlapping(row,statements=[]){
+    return statements.find(s=>String(s.credit_card_id)===String(row.credit_card_id)&&String(s.id)!==String(row.id)&&s.cycle_start<=row.cycle_end&&s.cycle_end>=row.cycle_start);
+  }
   function cycle(row,cards){
     const card=cards.find(c=>M.matchesRecord(row,c,cards));
     return card?key(card.id,M.cycleEnd(String(row.entry_date||row.month).slice(0,10),card.statement_day)):null;
@@ -98,5 +109,5 @@
     });
     return {rows,total:rows.reduce((n,x)=>n+x.remaining,0),uncertain:rows.some(x=>x.unknown||x.missing)};
   }
-  root.MPStatementModel=Object.freeze({latest,cycle,validate,reconcile,balances,reserve,categories});
+  root.MPStatementModel=Object.freeze({latest,periodStart,overlapping,cycle,validate,reconcile,balances,reserve,categories});
 })(typeof window!=='undefined'?window:globalThis);
