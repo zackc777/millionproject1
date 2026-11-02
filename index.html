@@ -168,7 +168,8 @@ async function moneyEngine(targetMonth){
   const portfolioValue=holdings.reduce((n,x)=>n+(+x.current_value||((+x.quantity||0)*(+x.current_price||0))||((+x.quantity||0)*(+x.avg_cost||0))),0);
   const untrackedInvestment=Math.max(0,st.totalInvestment-portfolioCost);
   const investmentValue=portfolioValue+untrackedInvestment;
-  return {...st,reconciliations,portfolioCost,portfolioValue,untrackedInvestment,investmentValue,totalAssets:st.cashLike+investmentValue-st.cardDebt};
+  const assets=MPFinanceModel.assetSummary({...st,investmentValue});
+  return {...st,reconciliations,portfolioCost,portfolioValue,untrackedInvestment,investmentValue,...assets,totalAssets:assets.netAssets};
 }
 async function persistMonthSnapshot(month,state){
   if(!u||!c)return false;
@@ -990,7 +991,7 @@ async function monthly(){
       <div>
         <div class="section-kicker">MONTH CENTER · 每月財務中心</div>
         <div class="month-title-main">📅 ${financeMonthLabel(selected)}</div>
-        <div class="month-title-sub">現金、消費、預算與資產圖表直接呈現；設定與交易明細按需要展開。</div>
+        <div class="month-title-sub">看這個月怎麼花、還能花多少；資產與百萬進度集中在總覽。</div>
       </div>
       <div class="month-switcher">
         <button class="month-nav-btn" onclick="shiftFinanceMonth(-1)" title="上一個月">‹</button>
@@ -1000,7 +1001,7 @@ async function monthly(){
       </div>
     </div>
 
-    ${mpCashFlowHtml({...state,investmentValue:displayInvestment,totalAssets:displayTotal})}
+    ${mpCashFlowHtml(state)}
     <div id="mp-finance-today" style="margin-top:18px">${mpFinanceTodayHtml(state,plan)}</div>
   </section>
 
@@ -1008,16 +1009,11 @@ async function monthly(){
     <article class="mp-v-panel">${mpVisualFlows(state)}</article>
     <article class="mp-v-panel">${mpVisualSpending(state,plan)}</article>
     <article id="mp-visual-budget" class="mp-v-panel">${mpVisualBudget(state,plan)}</article>
-    <article class="mp-v-panel">${mpVisualAssets({...state,investmentValue:displayInvestment,totalAssets:displayTotal})}</article>
-  </section>
-  <section class="mp-v-grid mp-v-month-charts">
     <article class="mp-v-panel" id="allocBox" aria-live="polite">${mpRollingAllocationHtml(state,plan)}</article>
-    <article class="mp-v-panel" id="mp-spending-review">${mpSpendingReviewHtml(state,plan)}</article>
   </section>
-  ${emergencyPanelHtml(state,eTarget)}
 
   <details id="mp-income-fold" class="mp-finance-fold salary-start" ${salary>0?'':'open'}><summary>薪資與收入 <small>${salary>0?'已登錄實領薪資 '+money(salary):'尚未登錄薪資；現有結轉現金仍可使用'}</small></summary>
-    <div class="section-title"><div><div class="section-kicker">STEP 1 · INCOME</div><h2>① ${financeMonthLabel(selected)}先從實領薪資開始</h2><p class="muted" style="margin:4px 0 0">月份已由上方「每月財務中心」決定，這裡不再讓你重複選月份。</p></div><span class="pill">${selected}</span></div>
+    <div class="section-title"><div><div class="section-kicker">INCOME</div><h2>${financeMonthLabel(selected)}實領薪資</h2><p class="muted" style="margin:4px 0 0">月份已由上方「每月財務中心」決定，這裡不再讓你重複選月份。</p></div><span class="pill">${selected}</span></div>
     <input id="salary_month" type="hidden" value="${selected}">
     <div class="row" style="align-items:end">
       <div class="field"><label>本月實領薪資</label><input id="salary_input" type="number" min="0" value="${salary||''}" placeholder="例如 50000"><div class="tiny">只填真正入帳薪資；獎金／兼職收入之後另外記一筆。</div></div>
@@ -1029,7 +1025,7 @@ async function monthly(){
   <details id="mp-budget-fold" class="mp-finance-fold"><summary>生活預算設定 <small>本月上限 ${money(planned)}</small></summary><div id="mp-life-budget-card" class="card" aria-live="polite"><div class="empty">正在整理生活責任…</div></div></details>
 
   <section class="card" id="ledgerBox" style="margin-top:14px">
-    <div class="section-title"><div><div class="section-kicker">STEP 4 · ACTUAL LEDGER</div><h3>④ 只記真正發生的金流</h3><div class="tiny">這裡新增、修改或刪除後，上面的色條、預備金、首頁與當月摘要會一起更新。</div></div><span class="pill">${selected}</span></div>
+    <div class="section-title"><div><div class="section-kicker">TRANSACTIONS</div><h3>收支與交易紀錄</h3><div class="tiny">這裡新增、修改或刪除後，上面的色條、預備金、首頁與當月摘要會一起更新。</div></div><span class="pill">${selected}</span></div>
     <details class="mp-finance-fold"><summary>新增一筆金流 <small>收入、支出、存款或投資</small></summary><div class="entry-form"><div class="field"><label>日期</label><input id="ed" type="date" value="${selected}-01"></div><div class="field"><label>這筆是</label><select id="et" onchange="refreshEntryCategories()"><option value="expense">支出</option><option value="income">其他收入</option><option value="saving">存款／留存</option><option value="investment">投資</option></select></div><div class="field"><label>用途</label><select id="ec"></select></div><div class="field"><label>金額</label><input id="ea" type="number" min="0" placeholder="0"></div><div class="field"><label>付款／來源</label><select id="epm"><option>銀行轉帳／現金</option><option>台新</option><option>富邦</option><option>國泰</option><option>證券交割</option><option>其他</option></select></div><button class="btn main" onclick="addFinanceEntry()">＋ 新增</button></div>
     <div class="field" style="margin-top:9px"><label>備註（可省略）</label><input id="en" placeholder="例如：房租、超市、0050 定期定額"></div></details><div id="entrySummary" style="margin-top:14px"></div>
     <details id="mp-ledger-fold" class="mp-ledger-details"><summary><strong id="mp-ledger-count">收支明細</strong><span>展開／收折 · 每頁 8 筆</span></summary>
@@ -1037,17 +1033,9 @@ async function monthly(){
     <div id="mp-ledger-pager" class="mp-ledger-pager" aria-label="收支明細分頁"></div></details>
   </section>
 
-  <details class="mp-finance-fold"><summary>資產組成與月底對帳 <small>檢視存款用途、投資市值及校正紀錄</small></summary>
-    <div class="section-title"><div><div class="section-kicker">STEP 5 · ${isPast&&hasPastSnapshot?'HISTORICAL SNAPSHOT':'AUTO RECONCILIATION'}</div><h3>⑤ ${isPast&&hasPastSnapshot?'當月資產結算':'資產由前面自動結算'}</h3><div class="tiny">${isPast&&hasPastSnapshot?'現金依對帳與金流重算；投資保留當月快照市值。':'前面每一筆收入、支出、存款、投資都會直接進入資產引擎。'}</div></div>${isPast&&hasPastSnapshot?'<span class="month-snapshot-badge">📌 歷史快照</span>':'<span class="live-badge">單一資料來源</span>'}</div>
-    <div class="finance-kpis">
-      <div class="finance-kpi"><div class="label">未指定用途現金</div><div class="num">${money(state.liquidCash)}</div></div>
-      <div class="finance-kpi"><div class="label">緊急預備金</div><div class="num">${money(displayEmergency)}</div><div class="tiny">目標 ${money(eTarget)}</div></div>
-      <div class="finance-kpi"><div class="label">其他專用存款</div><div class="num">${money(state.otherSaving)}</div></div>
-      <div class="finance-kpi"><div class="label">投資資產</div><div class="num">${displayInvestment===null?'未保存當月市值':money(displayInvestment)}</div></div>
-    </div>
-    <div class="card hero" style="margin-top:12px;padding:16px"><div class="split"><div><div class="eyebrow">${isPast&&hasPastSnapshot?'MONTH-END SNAPSHOT':'SYSTEM TOTAL ASSETS'}</div><div class="v">${displayTotal===null?'缺當月投資快照':money(displayTotal)}</div><div class="tiny" style="color:#cbd5e1">${isPast&&hasPastSnapshot?'現金依對帳重算，投資採當月快照':'淨資產＝現金＋存款＋投資資產 − 待繳卡費'}</div></div>${isPast&&hasPastSnapshot?'':`<button class="btn ghost" onclick="saveMonth()">儲存本月快照</button>`}</div></div>
-    ${!isPast&&state.liquidCash<0?`<div class="status-note" style="margin-top:10px;border-color:#fecaca;background:#fff1f2"><b class="danger">⚠️ 可用現金為負。</b> 可能有系統啟用前的既有資產未建立起始餘額，或金流漏記。</div>`:''}
-    <div class="status-note" style="margin-top:10px">依截至 ${esc(state.asOf)} 的金流計算：現金 ${money(state.liquidCash)}，尚待繳卡費 ${money(state.cardDebt)}。${isPast&&hasPastSnapshot?'對帳與後補金流會重算現金；投資市值保留當月快照。':'現金與存款是資產，待繳卡費是負債。'}</div>
+  <details class="mp-finance-fold"><summary>月底對帳與快照 <small>核對實際餘額，保存這個月的結算</small></summary>
+    <div class="status-note">截至 ${esc(state.asOf)}：現金與存款 ${money(displayCashLike)} ＋ 投資 ${displayInvestment===null?'未保存當月市值':money(displayInvestment)} − 待繳卡費 ${money(state.cardDebt)} ＝ <b>淨資產 ${displayTotal===null?'尚無完整估值':money(displayTotal)}</b>。<div class="tiny">${isPast?'歷史投資採當月快照；現金依對帳與金流重算。':'資產包含預備金與專用存款。總覽可查看完整資產圓環與百萬進度。'}</div></div>
+    <div class="actions" style="margin-top:12px">${isPast&&hasPastSnapshot?'<span class="month-snapshot-badge">已保存當月快照</span>':`<button class="btn main" onclick="saveMonth()">儲存本月快照</button>`}<button class="btn ghost" onclick="mp31Go('o')">查看資產總覽</button></div>
     ${mpCashReconciliationPanel(state)}
     <input id="m" type="hidden" value="${selected}"><input id="inc" type="hidden" value="${income||0}"><input id="exp" type="hidden" value="${expense||0}"><input id="buy" type="hidden" value="${investment||0}"><input id="ef_balance" type="hidden" value="${state.emergency||0}">
   </details>
@@ -1095,3 +1083,4 @@ init();
 })();
 </script>
 </body></html>
+

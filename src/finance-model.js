@@ -95,6 +95,13 @@
     st.statementReserve=statements.length?root.MPStatementModel.reserve(st):{rows:[],total:0,uncertain:false};
     return st;
   }
+  // Keep gross holdings, card liability and the net goal basis explicit.
+  function assetSummary(st) {
+    const known=st.investmentValue!=null&&Number.isFinite(Number(st.investmentValue))&&Number.isFinite(Number(st.cashLike));
+    const grossAssets=known?Number(st.cashLike)+Number(st.investmentValue):null;
+    const cardDebt=Number(st.cardDebt)||0;
+    return {grossAssets,cardDebt,netAssets:known?grossAssets-cardDebt:null};
+  }
   function rolling(st, profile, target, today = cardModel.today()) {
     const mode = st.month < today.slice(0, 7) ? 'past' : st.month > today.slice(0, 7) ? 'future' : 'current';
     const days = new Date(Date.UTC(+st.month.slice(0, 4), +st.month.slice(5, 7), 0)).getUTCDate();
@@ -158,5 +165,6 @@
       historyMonths:observedMonths.length, previousExpense:previousObserved ? previousExpense : null, expenseDelta:previousObserved ? st.monthExpense - previousExpense : null,
       dailyLimit:remainingDays > 0 ? Math.floor(spendingAvailable / remainingDays) : 0, top };
   }
-  root.MPFinanceModel = Object.freeze({ ledger, rolling, isCard, cardBalances, categoryKey, monthOf });
+  root.MPFinanceModel = Object.freeze({ ledger, rolling, assetSummary, isCard, cardBalances, categoryKey, monthOf });
 })(typeof window !== 'undefined' ? window : globalThis);
+
