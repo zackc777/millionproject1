@@ -37,7 +37,7 @@
       <div class="field"><label for="mpcash-date">餘額日期（日終）</label><input id="mpcash-date" type="date" value="${e(row?.balance_date||yesterday())}" max="${yesterday()}" ${row?'disabled':''} onchange="mpPreviewCash()"></div>
       <p class="tiny">最晚填昨天，避免今天稍後的交易被漏算。月底對帳可於次月初填上月底餘額。</p>
       <div class="mp-cash-fields">${fields.map(([key,label,value])=>`<div class="field"><label for="mpcash-${key}">${label}</label><input id="mpcash-${key}" type="number" inputmode="decimal" min="0" step="0.01" value="${e(row?.[key]??value)}" oninput="mpPreviewCash()"></div>`).join('')}</div>
-      <p class="tiny">銀行合計已包含預備金及專用存款，下方兩項只是劃分用途，不會再加一次。不同帳戶互轉也不算支出。</p>
+      <p class="tiny">銀行合計請填銀行顯示的餘額，不要先減掉未繳卡費。合計須包含預備金及專用存款，下方兩項只是劃分用途，不會再加一次。不同帳戶互轉也不算支出。</p>
       <div id="mpcash-preview" class="status-note" role="status"></div>
       <div class="field"><label for="mpcash-note">差額說明（選填）</label><input id="mpcash-note" maxlength="1000" value="${e(row?.note)}" placeholder="例如：漏記現金花費、期初存款未登錄"></div>
       <label><input id="mpcash-confirm" type="checkbox"> 我已核對日期、所有帳戶及現金；以此餘額校正資產</label>
@@ -83,3 +83,4 @@
     <details><summary>對帳歷史（${st.reconciliations.length} 筆）</summary>${[...st.reconciliations].sort((a,b)=>b.balance_date.localeCompare(a.balance_date)).map(x=>`<div class="mp-cash-history"><div><b>${e(x.balance_date)}</b><div>現金＋存款 ${fmt(Number(x.bank_total)+Number(x.wallet_total))}</div><small>保存時差額 ${fmt(Number(x.bank_total)+Number(x.wallet_total)-Number(x.expected_cash))} · ${e(x.note||'未填原因')}</small></div><button class="btn ghost" onclick="mpOpenCash('${e(x.id)}')">編輯／刪除</button></div>`).join('')||'<p>尚無對帳紀錄</p>'}</details></div>`;
   const style=document.createElement('style');style.textContent='.mp-cash-dialog{width:min(620px,100%);max-height:88dvh;overflow:auto}.mp-cash-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.mp-cash-fields input{min-width:0;width:100%;font-size:16px}.mp-cash-panel{margin-top:16px;padding:16px;border:1px solid #dbeafe;border-radius:16px;background:#f8fafc}.mp-cash-history{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #e2e8f0}.mp-cash-history small{overflow-wrap:anywhere}.mp-cash-dialog input[type=checkbox]{width:auto}@media(max-width:600px){.mp-cash-fields{grid-template-columns:1fr}.mp-cash-dialog{padding:16px}.mp-cash-panel>.split{align-items:stretch;flex-direction:column}.mp-cash-history{flex-direction:column}}';document.head.appendChild(style);
 })(window);
+

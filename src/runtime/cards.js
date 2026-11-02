@@ -207,9 +207,9 @@ window.MILLIONPROJECT_CARD_VERSION="cards-source-1";
   window.mpCreditCards=async()=>{
     const app=document.getElementById('app');if(!app)return;
     try{
-      const [cards,allEntries,pays,statements]=await Promise.all([readMoneyTable('credit_cards','created_at'),readMoneyTable('finance_entries','entry_date'),readMoneyTable('credit_card_payments','payment_date'),readMoneyTable('credit_card_statements','cycle_end')]);
+      const [cards,allEntries,pays,statements,reconciliations]=await Promise.all([readMoneyTable('credit_cards','created_at'),readMoneyTable('finance_entries','entry_date'),readMoneyTable('credit_card_payments','payment_date'),readMoneyTable('credit_card_statements','cycle_end'),readMoneyTable('cash_reconciliations','balance_date'),loadEmergencyGoal()]);
       const today=new Date(),month=model.today(today).slice(0,7);
-      const finance=MPFinanceModel.ledger({month,entries:allEntries,payments:pays,cards,statements});
+      const finance=MPFinanceModel.ledger({month,entries:allEntries,payments:pays,cards,statements,reconciliations});
       const entries=finance.all.filter(x=>x.entry_type==='expense');
       const ambiguous=finance.unresolved;
       const balances=finance.bills;
@@ -260,9 +260,9 @@ window.MILLIONPROJECT_CARD_VERSION="cards-source-1";
 
       app.innerHTML=`<section class="card">
         <div class="split"><div><div class="section-kicker">CREDIT CARD CONTROL</div><h2 style="margin:4px 0">信用卡帳單與繳款</h2><div class="tiny">帳單登錄一次，扣款再確認一次；逐筆記帳可選用，已核對帳單不與明細重複加總。</div></div><button class="btn main" onclick="mpCardSettings(null)">＋ 新增信用卡</button></div>
-        <div class="status-note" style="margin-top:10px"><b>全卡共用安全可刷池：${moneyx(safePool)}</b><div class="tiny">這是一個共用池，不是每張卡各有 ${moneyx(safePool)}。銀行額度再高，也不會提高你的生活預算。</div></div>
+        <div class="status-note" style="margin-top:10px"><b>目前還能刷多少（估計）：${allocation.uncertain||finance.unresolved?'待核對資料':moneyx(safePool)}</b><div class="tiny">所有信用卡合計共用這個額度；已保留卡費、固定費用與必要預留。${finance.reconciliation?'現金基準 '+escx(finance.reconciliation.balance_date)+'，其後依金流更新。':'尚未核對現金餘額。'} ${escx(allocation.stage)}</div></div>
       </section>
-      ${mpCashFlowHtml(finance)}
+      ${mpCashFlowHtml(finance,'cards')}
       ${mpStatementPanel(finance)}
       ${ambiguous?`<section class="card" role="status" style="margin-top:14px">有 ${ambiguous} 筆舊紀錄的卡片名稱重複，尚未分配到個別帳單。請確認原刷卡或繳款紀錄；目前單卡可用額度可能高估。</section>`:''}
       <section class="grid g3" style="margin-top:14px">${rows||'<div class="card"><div class="empty">尚未建立信用卡</div></div>'}</section>
@@ -289,3 +289,4 @@ window.MILLIONPROJECT_CARD_VERSION="cards-source-1";
 
   try{creditCards=window.mpCreditCards}catch(_){window.creditCards=window.mpCreditCards}
 })();
+

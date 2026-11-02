@@ -1,13 +1,17 @@
-function mpCashFlowHtml(st) {
-  return `<div class="finance-kpis mp-cash-summary">
-    <div class="finance-kpi"><div class="label">未指定用途現金</div><div class="num">${money(st.liquidCash)}</div><div class="tiny">含上月結轉；已排除預備金及專用存款，尚未扣下方待繳與生活預留</div></div>
-    <div class="finance-kpi"><div class="label">淨資產</div><div class="num">${st.totalAssets==null?'缺當月投資快照':money(st.totalAssets)}</div><div class="tiny">全部現金存款＋投資市值－待繳卡費</div></div>
-    <div class="finance-kpi"><div class="label">${esc(st.month)} 認列消費</div><div class="num">${money(st.monthExpense)}</div><div class="tiny">現金消費 ${money(st.monthCashExpense)} ＋ 信用卡消費 ${money(st.monthCardSpend)}</div></div>
-    <div class="finance-kpi"><div class="label">${esc(st.month)} 實際扣款</div><div class="num">${money(st.monthCashOut)}</div><div class="tiny">現金消費 ${money(st.monthCashExpense)} ＋ 繳卡費 ${money(st.monthCardPayments)}；不含存款及投資轉出</div></div>
-  </div><div class="status-note" style="margin-top:10px">待繳卡費 <b>${money(st.cardDebt)}</b> · ${st.reconciliation?'現金基準 '+esc(st.reconciliation.balance_date)+'，其後依金流推算':'現金尚未對帳'} <button class="btn ghost" onclick="mpOpenCash()">核對現金</button></div>
-  <details class="mp-finance-fold"><summary>這些數字怎麼算？信用卡何時認列？</summary><p>你使用帳單模式時，信用卡新增消費計入「結帳月份」；繳款只在實際付款月份扣現金，不再算一次消費。尚未用帳單對帳的逐筆刷卡依消費日認列。</p><p>因此，上月帳單本月繳款：上月顯示消費，本月顯示卡費扣款。存款是用途移轉；買入投資是現金轉為投資資產，都不列生活消費。</p><p>淨資產：現金及存款 ${money(st.cashLike)} ＋ 投資 ${st.investmentValue==null?'未保存當月市值':money(st.investmentValue)} − 卡費負債 ${money(st.cardDebt)}。</p><p>本月資金增減 ${money(st.monthUnallocated)}＝收入 ${money(st.monthIncome)} − 實際扣款 ${money(st.monthCashOut)} − 存款 ${money(st.monthSaving)} − 投資 ${money(st.monthInvestment)} ＋ 未指定用途現金校正 ${money(st.monthCashAdjustment)}。這不是你的全部現金餘額。</p>${st.unmatchedPayments?`<p>有 ${money(st.unmatchedPayments)} 繳款超過對應消費，可能為舊帳單或溢繳。現金已扣，不會猜成當月消費。</p>`:''}</details><details class="mp-finance-fold"><summary>信用卡帳單與本月繳款對照</summary><p class="tiny">帳單期別決定消費認列；付款日期決定現金扣款。兩者不是兩筆消費。</p>
-    ${(st.bills||[]).filter(b=>b.outstanding>0||String(b.cycleEnd).startsWith(st.month)||String(b.dueDate).startsWith(st.month)).map(b=>`<div class="mp-card-reconcile"><b>${esc(b.issuer||'未指定卡片')}</b><span>帳單 ${esc(b.cycleEnd)} · 到期 ${esc(b.dueDate||'未確認')}</span><strong>尚待繳 ${money(b.outstanding)}</strong></div>`).join('')||'<p>這個月沒有相關帳單或未清餘額。</p>'}
-    <h4>本月實際繳款</h4>${(st.monthPayments||[]).map(p=>`<div class="mp-card-reconcile"><b>${esc(p.issuer)}</b><span>${esc(String(p.payment_date).slice(0,10))} 付款 · 帳單 ${esc(String(p.cycle_end).slice(0,10))}</span><strong>${money(p.amount)}</strong></div>`).join('')||'<p>本月尚無繳款紀錄；不代表沒有待繳帳單。</p>'}<button class="btn ghost" onclick="mp31Go('c')">管理帳單／確認繳款</button></details>`;
+function mpCashFlowHtml(st,view='month') {
+  const cards=view==='cards';
+  const tiles=cards?[
+    ['全部待繳卡費',st.cardDebt,'包含以前未清與已記錄的未出帳消費'],
+    ['本月信用卡消費',st.monthCardSpend,'帳單以結帳月份認列；未對帳明細依刷卡日'],
+    ['本月已繳卡費',st.monthCardPayments,'已從現金扣除；不再增加消費']
+  ]:[
+    ['實際收入',st.monthIncome,'只計已入帳收入'],
+    ['現金支出／還款',st.monthCashOut,'現金消費 '+money(st.monthCashExpense)+' ＋ 繳卡費 '+money(st.monthCardPayments)],
+    ['移入專用存款',st.monthSaving,'移到預備金或其他用途；仍是你的資產'],
+    ['投入投資',st.monthInvestment,'實際投入本金；投資市值請看總覽']
+  ];
+  return `<div class="finance-kpis mp-cash-summary ${cards?'mp-today-kpis':''}">${tiles.map(([label,value,hint])=>`<div class="finance-kpi"><div class="label">${label}</div><div class="num">${money(value)}</div><div class="tiny">${hint}</div></div>`).join('')}</div>
+    <div class="status-note" style="margin-top:10px">${cards?'帳單記消費，付款扣現金。':`<b>本月已記錄消費 ${money(st.monthExpense)}</b>＝現金消費 ${money(st.monthCashExpense)} ＋ 信用卡消費 ${money(st.monthCardSpend)}。`} 繳卡費不重複算消費，存款與投資也不算生活花費。${st.unmatchedPayments?`<p class="tiny">有 ${money(st.unmatchedPayments)} 繳款超過對應消費，可能為舊帳單或溢繳；現金已扣，請核對帳單歸屬。</p>`:''}</div>`;
 }
 function mpFinanceTodayHtml(st,plan){
   if(plan.mode!=='current')return `<div class="status-note">${plan.mode==='past'?'正在回顧歷史月份；每日可花與即時配置只在本月顯示。':'未來月份尚未開始，不將預期薪資當成可用現金。'} <button class="btn ghost" onclick="goCurrentFinanceMonth()">查看本月建議</button></div>`;
@@ -70,3 +74,4 @@ if(typeof document!=='undefined'&&!document.getElementById('mp-finance-view-styl
   `;
   document.head.appendChild(style);
 }
+
