@@ -159,14 +159,16 @@ async function readMoneyTable(table,order){
 }
 async function moneyEngine(targetMonth){
   const month=monthKey(targetMonth)||MPCardModel.today().slice(0,7);
-  const [entries,payments,cards,holdings,statements,reconciliations]=await Promise.all([
+  const [entries,payments,cards,holdings,statements,reconciliations,trades]=await Promise.all([
     readMoneyTable('finance_entries','entry_date'),readMoneyTable('credit_card_payments','payment_date'),
-    readMoneyTable('credit_cards','created_at'),readMoneyTable('portfolio','updated_at'),readMoneyTable('credit_card_statements','cycle_end'),readMoneyTable('cash_reconciliations','balance_date')
+    readMoneyTable('credit_cards','created_at'),readMoneyTable('portfolio','updated_at'),readMoneyTable('credit_card_statements','cycle_end'),readMoneyTable('cash_reconciliations','balance_date'),readMoneyTable('investment_transactions','trade_date')
   ]);
   const st=MPFinanceModel.ledger({month,entries,payments,cards,statements,reconciliations});
   const portfolioCost=holdings.reduce((n,x)=>n+(+x.quantity||0)*(+x.avg_cost||0),0);
   const portfolioValue=holdings.reduce((n,x)=>n+(+x.current_value||((+x.quantity||0)*(+x.current_price||0))||((+x.quantity||0)*(+x.avg_cost||0))),0);
-  const untrackedInvestment=Math.max(0,st.totalInvestment-portfolioCost);
+  const linkedTrades=new Set(trades.map(t=>t.finance_entry_id).filter(Boolean));
+  const untrackedInvestment=st.all.filter(e=>e.entry_type==='investment'&&!linkedTrades.has(e.id)).reduce((n,e)=>n+Number(e.amount||0),0);
+  st.pendingInvestmentSales=trades.filter(t=>t.side==='sell'&&t.trade_date<=st.asOf&&(!t.settlement_date||t.settlement_date>st.asOf)).reduce((n,t)=>n+Number(t.amount||0),0);
   const investmentValue=portfolioValue+untrackedInvestment;
   const assets=MPFinanceModel.assetSummary({...st,investmentValue});
   return {...st,reconciliations,portfolioCost,portfolioValue,untrackedInvestment,investmentValue,...assets,totalAssets:assets.netAssets};
@@ -178,7 +180,7 @@ async function persistMonthSnapshot(month,state){
     user_id:u.id,month:monthKey(month)+'-01',income:st.monthIncome,expense:st.monthExpense,
     investable:st.monthIncome-st.monthExpense,cash_savings:st.cashLike,emergency_fund:st.emergency,
     total_assets:st.totalAssets,etf_contribution:st.monthInvestment,
-    notes:'[AUTO_SNAPSHOT_V2] '+JSON.stringify({cardDebt:st.cardDebt,investmentValue:st.investmentValue,monthCashOut:st.monthCashOut}),updated_at:new Date().toISOString()
+    notes:'[AUTO_SNAPSHOT_V2] '+JSON.stringify({cardDebt:st.cardDebt,investmentValue:st.investmentValue,pendingInvestmentSales:st.pendingInvestmentSales||0,monthInvestmentSales:st.monthInvestmentSales||0,monthCashOut:st.monthCashOut}),updated_at:new Date().toISOString()
   };
   const {error}=await c.from('monthly_finance').upsert(row,{onConflict:'user_id,month'});
   if(error){console.error('auto snapshot sync failed',error);return false}
@@ -374,7 +376,7 @@ function renderEntryTable(entries,state,page=0){
   const pager=$('mp-ledger-pager');
   if(pager)pager.innerHTML=`<span role="status">${lines.length?'第 '+(page*pageSize+1)+'–'+Math.min(lines.length,(page+1)*pageSize)+' 筆，共 '+lines.length+' 筆':'尚無紀錄'}</span><div><button type="button" class="btn ghost" onclick="mpLedgerPage(${page-1})" ${page===0?'disabled':''}>上一頁</button><span>${page+1} / ${pages}</span><button type="button" class="btn ghost" onclick="mpLedgerPage(${page+1})" ${page===pages-1?'disabled':''}>下一頁</button></div>`;
   rows.innerHTML=lines.slice(page*pageSize,(page+1)*pageSize).map(x=>{
-    const payment=x.kind==='payment',type=payment?'繳卡費':({expense:'消費支出',income:'收入',saving:'存款',investment:'投資'}[x.entry_type]||x.entry_type);
+    const payment=x.kind==='payment',type=payment?'繳卡費':({expense:'消費支出',income:'收入',saving:'存款',investment:'買入投資',investment_sale:'賣出款入帳'}[x.entry_type]||x.entry_type);
     const cells=[x.date,type,payment?'帳單 '+String(x.cycle_end).slice(0,10):(x.category||''),money(x.amount),payment?x.issuer:(x.payment_method||'—'),payment?((x.note||'')+' · 已扣現金，不重複計消費'):financeDisplayNote(x.note)];
     const labels=['日期','類型','用途','金額','付款方式','備註'];
     const actions=x.statement_id?`<button class="btn ghost" onclick="mpEditStatement('${x.statement_id}')">查看／編輯帳單</button>`:`<button class="btn ghost" onclick="${payment?'mpEditCardPayment':'editFinanceEntry'}('${x.id}')">編輯</button><button class="btn danger-btn" onclick="${payment?'mpDeleteCardPayment':'deleteFinanceEntry'}('${x.id}')">刪除</button>`;
@@ -983,7 +985,7 @@ async function monthly(){
   const displayCashLike=state.cashLike;
   const displayInvestment=isPast?(hasPastSnapshot?snapshotInvestmentValue(existing):null):state.investmentValue;
   const displayOtherCash=Math.max(0,displayCashLike-displayEmergency);
-  const displayTotal=displayInvestment===null?null:displayCashLike+displayInvestment-state.cardDebt;
+  const displayTotal=displayInvestment===null?null:displayCashLike+displayInvestment+(state.pendingInvestmentSales||0)-state.cardDebt;
 
   $('app').innerHTML=`
   <section class="card month-center">
@@ -1034,7 +1036,7 @@ async function monthly(){
   </section>
 
   <details class="mp-finance-fold"><summary>月底對帳與快照 <small>核對實際餘額，保存這個月的結算</small></summary>
-    <div class="status-note">截至 ${esc(state.asOf)}：現金與存款 ${money(displayCashLike)} ＋ 投資 ${displayInvestment===null?'未保存當月市值':money(displayInvestment)} − 待繳卡費 ${money(state.cardDebt)} ＝ <b>淨資產 ${displayTotal===null?'尚無完整估值':money(displayTotal)}</b>。<div class="tiny">${isPast?'歷史投資採當月快照；現金依對帳與金流重算。':'資產包含預備金與專用存款。總覽可查看完整資產圓環與百萬進度。'}</div></div>
+    <div class="status-note">截至 ${esc(state.asOf)}：現金與存款 ${money(displayCashLike)} ＋ 投資 ${displayInvestment===null?'未保存當月市值':money(displayInvestment)} ＋ 待入帳交割款 ${money(state.pendingInvestmentSales)} − 待繳卡費 ${money(state.cardDebt)} ＝ <b>淨資產 ${displayTotal===null?'尚無完整估值':money(displayTotal)}</b>。<div class="tiny">${isPast?'歷史投資採當月快照；現金依對帳與金流重算。':'資產包含預備金與專用存款。總覽可查看完整資產圓環與百萬進度。'}</div></div>
     <div class="actions" style="margin-top:12px">${isPast&&hasPastSnapshot?'<span class="month-snapshot-badge">已保存當月快照</span>':`<button class="btn main" onclick="saveMonth()">儲存本月快照</button>`}<button class="btn ghost" onclick="mp31Go('o')">查看資產總覽</button></div>
     ${mpCashReconciliationPanel(state)}
     <input id="m" type="hidden" value="${selected}"><input id="inc" type="hidden" value="${income||0}"><input id="exp" type="hidden" value="${expense||0}"><input id="buy" type="hidden" value="${investment||0}"><input id="ef_balance" type="hidden" value="${state.emergency||0}">

@@ -12,14 +12,14 @@ window.MILLIONPROJECT_INVESTMENT_GUARD_VERSION="investment-guard-38";
  };
  window.editFinanceEntry=async id=>{
    const x=await getEntry(id);if(!x)return;
-   if(x.entry_type!=='investment')return typeof oldEdit==='function'?oldEdit(id):null;
+   if(!['investment','investment_sale'].includes(x.entry_type))return typeof oldEdit==='function'?oldEdit(id):null;
    const {data:tx,error}=await c.from('investment_transactions').select('id').eq('user_id',u.id).eq('finance_entry_id',id).maybeSingle();if(error)return alert('讀取投資交易失敗：'+error.message);
    if(tx?.id&&typeof mpInvEditTrade==='function')return mpInvEditTrade(tx.id);
    if(typeof mpInvRepairLegacy==='function')return mpInvRepairLegacy(id);
  };
  window.deleteFinanceEntry=async id=>{
    const x=await getEntry(id);if(!x)return;
-   if(x.entry_type!=='investment')return typeof oldDelete==='function'?oldDelete(id):null;
+   if(!['investment','investment_sale'].includes(x.entry_type))return typeof oldDelete==='function'?oldDelete(id):null;
    const {data:tx,error}=await c.from('investment_transactions').select('id').eq('user_id',u.id).eq('finance_entry_id',id).maybeSingle();if(error)return alert('讀取投資交易失敗：'+error.message);
    if(tx?.id&&typeof mpInvDeleteTrade==='function')return mpInvDeleteTrade(tx.id);
    if(typeof mpInvDeleteLegacy==='function')return mpInvDeleteLegacy(id);

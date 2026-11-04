@@ -52,6 +52,7 @@
     const budget=add('調整生活預算','修改固定責任與彈性花費上限','預算 配置 生活費 每日 能花',()=>root.mpFinanceJump('mp-budget-fold'));
     const investment=add('記錄實際投資','開啟成交表單；計畫不等於已買入','買股票 ETF 買入 交易 定期定額',()=>openInvestmentBuy());
     const saving=add('存入預備金','記錄實際移入預備金的金額','儲蓄 存錢 緊急 留存',()=>mp31Quick('saving',{category:'緊急預備金'}));
+    add('記錄實際賣出','減少持股並記錄交割款與損益','賣股票 賣出 ETF 贖回',()=>openInvestmentSell());
     add('其他收入','獎金、退款或兼職實際入帳','收入 獎金 兼職',()=>mp31Quick('income'));
     add('查看每月明細','開啟本月完整收支記錄','編輯 刪除 金流 歷史',()=>root.mpFinanceJump('mp-ledger-fold'));
     add('管理投資與定期定額','查看持倉、交易與計畫','投資 股票 ETF 報酬',()=>mp31Go('p'));

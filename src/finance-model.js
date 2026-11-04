@@ -55,15 +55,15 @@
     const allPayments = payments.filter(x => String(x.payment_date).slice(0, 10) <= asOf);
     const monthPayments = allPayments.filter(x => String(x.payment_date).slice(0, 7) === month);
     const totals = rows => ({ Income:sum(rows.filter(x => x.entry_type === 'income')), Expense:sum(rows.filter(x => x.entry_type === 'expense')),
-      Saving:sum(rows.filter(x => x.entry_type === 'saving')), Investment:sum(rows.filter(x => x.entry_type === 'investment')),
+      Saving:sum(rows.filter(x => x.entry_type === 'saving')), Investment:sum(rows.filter(x => x.entry_type === 'investment')), InvestmentSales:sum(rows.filter(x => x.entry_type === 'investment_sale')),
       CashExpense:sum(rows.filter(x => x.entry_type === 'expense' && !isCard(x, cards))), CardSpend:sum(rows.filter(x => x.entry_type === 'expense' && isCard(x, cards))) });
     const st = { month, asOf, all, current, cards, allPayments, monthPayments, statements:statements.filter(s=>s.cycle_end<=asOf),rawEntries };
     for (const [prefix, rows] of [['total', all], ['month', current]]) for (const [key, value] of Object.entries(totals(rows))) st[prefix + key] = value;
     st.monthCardPayments = sum(monthPayments); st.totalCardPayments = sum(allPayments);
     st.monthCashOut = st.monthCashExpense + st.monthCardPayments;
     st.totalCashOut = st.totalCashExpense + st.totalCardPayments;
-    st.monthUnallocated = st.monthIncome - st.monthCashOut - st.monthSaving - st.monthInvestment;
-    st.liquidCash = st.totalIncome - st.totalCashOut - st.totalSaving - st.totalInvestment;
+    st.monthUnallocated = st.monthIncome + st.monthInvestmentSales - st.monthCashOut - st.monthSaving - st.monthInvestment;
+    st.liquidCash = st.totalIncome + st.totalInvestmentSales - st.totalCashOut - st.totalSaving - st.totalInvestment;
     st.emergency = sum(all.filter(x => x.entry_type === 'saving' && String(x.category).includes('緊急預備金')));
     st.otherSaving = st.totalSaving - st.emergency;
     // A confirmed day-end balance is an absolute anchor, not another income/expense.
@@ -74,7 +74,7 @@
       const before=all.filter(x=>date(x)<=row.balance_date),t=totals(before);
       const paid=sum(allPayments.filter(x=>String(x.payment_date).slice(0,10)<=row.balance_date));
       const savedEmergency=sum(before.filter(x=>x.entry_type==='saving'&&String(x.category).includes('緊急預備金')));
-      return {liquid:Number(row.bank_total)+Number(row.wallet_total)-Number(row.emergency)-Number(row.other_saving)-(t.Income-t.CashExpense-paid-t.Saving-t.Investment),
+      return {liquid:Number(row.bank_total)+Number(row.wallet_total)-Number(row.emergency)-Number(row.other_saving)-(t.Income+t.InvestmentSales-t.CashExpense-paid-t.Saving-t.Investment),
         emergency:Number(row.emergency)-savedEmergency,other:Number(row.other_saving)-(t.Saving-savedEmergency)};
     };
     st.reconciliation=observed.at(-1)||null;st.reconciliations=observed;
@@ -98,7 +98,7 @@
   // Keep gross holdings, card liability and the net goal basis explicit.
   function assetSummary(st) {
     const known=st.investmentValue!=null&&Number.isFinite(Number(st.investmentValue))&&Number.isFinite(Number(st.cashLike));
-    const grossAssets=known?Number(st.cashLike)+Number(st.investmentValue):null;
+    const grossAssets=known?Number(st.cashLike)+Number(st.investmentValue)+(Number(st.pendingInvestmentSales)||0):null;
     const cardDebt=Number(st.cardDebt)||0;
     return {grossAssets,cardDebt,netAssets:known?grossAssets-cardDebt:null};
   }
