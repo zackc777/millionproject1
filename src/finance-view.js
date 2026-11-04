@@ -8,10 +8,10 @@ function mpCashFlowHtml(st,view='month') {
     ['實際收入',st.monthIncome,'只計已入帳收入'],
     ['現金支出／還款',st.monthCashOut,'現金消費 '+money(st.monthCashExpense)+' ＋ 繳卡費 '+money(st.monthCardPayments)],
     ['移入專用存款',st.monthSaving,'移到預備金或其他用途；仍是你的資產'],
-    ['投入投資',st.monthInvestment,'實際投入本金；投資市值請看總覽']
+    ['投入投資',st.monthInvestment,'買入扣款；本月賣出款入帳 '+money(st.monthInvestmentSales||0)]
   ];
   return `<div class="finance-kpis mp-cash-summary ${cards?'mp-today-kpis':''}">${tiles.map(([label,value,hint])=>`<div class="finance-kpi"><div class="label">${label}</div><div class="num">${money(value)}</div><div class="tiny">${hint}</div></div>`).join('')}</div>
-    <div class="status-note" style="margin-top:10px">${cards?'帳單記消費，付款扣現金。':`<b>本月已記錄消費 ${money(st.monthExpense)}</b>＝現金消費 ${money(st.monthCashExpense)} ＋ 信用卡消費 ${money(st.monthCardSpend)}。`} 繳卡費不重複算消費，存款與投資也不算生活花費。${st.unmatchedPayments?`<p class="tiny">有 ${money(st.unmatchedPayments)} 繳款超過對應消費，可能為舊帳單或溢繳；現金已扣，請核對帳單歸屬。</p>`:''}</div>`;
+    <div class="status-note" style="margin-top:10px">${cards?'帳單記消費，付款扣現金。':`<b>本月已記錄消費 ${money(st.monthExpense)}</b>＝現金消費 ${money(st.monthCashExpense)} ＋ 信用卡消費 ${money(st.monthCardSpend)}。`} 繳卡費不重複算消費，存款與投資也不算生活花費。${!cards&&st.monthInvestmentSales?` 賣出款 ${money(st.monthInvestmentSales)} 已增加現金，另列投資回收，不併入薪資收入。`:""}${!cards&&st.pendingInvestmentSales?` 另有 ${money(st.pendingInvestmentSales)} 賣出款尚未入帳，不列每日可用現金。`:""}${st.unmatchedPayments?`<p class="tiny">有 ${money(st.unmatchedPayments)} 繳款超過對應消費，可能為舊帳單或溢繳；現金已扣，請核對帳單歸屬。</p>`:''}</div>`;
 }
 function mpFinanceTodayHtml(st,plan){
   if(plan.mode!=='current')return `<div class="status-note">${plan.mode==='past'?'正在回顧歷史月份；每日可花與即時配置只在本月顯示。':'未來月份尚未開始，不將預期薪資當成可用現金。'} <button class="btn ghost" onclick="goCurrentFinanceMonth()">查看本月建議</button></div>`;
